@@ -38,7 +38,7 @@ jobs:
                   git clone --depth=1 -b v1.0.0 https://github.com/libgit2/libgit2.git ~/libgit2_src
                   cd ~/libgit2_src
                   cmake . -DBUILD_CLAR=OFF -DCMAKE_BUILD_TYPE=Release -DEMBED_SSH_PATH=~/libssh2_src -DCMAKE_INSTALL_PREFIX=~/libgit2
-                  cmake --build . --target install
+                  sudo cmake --build . --target install
                   # move bins to shared system libs folders so they can be found when you import pygit2
                   sudo cp -r ~/libgit2/* /usr/bin
                   sudo cp -r ~/libgit2/* /usr/local
