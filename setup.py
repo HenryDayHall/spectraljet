@@ -6,8 +6,6 @@ with open("requirements.txt", 'r') as req_file:
         line = line.strip()
         if line[0] == '#':
             continue
-        if line[-1] == ',':
-            line = line[:-1]
         requirements.append(line)
 
 setup(
