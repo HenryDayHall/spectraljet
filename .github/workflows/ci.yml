@@ -32,8 +32,8 @@ jobs:
                   cmake . -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DCMAKE_INSTALL_PREFIX=~/libssh2
                   cmake --build . --target install
                   # move bins to shared system libs folders so they can be found by libgit2
-                  cp -r ~/libssh2/* /usr/bin
-                  cp -r ~/libssh2/* /usr/local
+                  sudo cp -r ~/libssh2/* /usr/bin
+                  sudo cp -r ~/libssh2/* /usr/local
                   ldconfig
                   git clone --depth=1 -b v1.0.0 https://github.com/libgit2/libgit2.git ~/libgit2_src
                   cd ~/libgit2_src
