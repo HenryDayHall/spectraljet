@@ -19,30 +19,29 @@ jobs:
                   python-version: 3.6
             - name: Install dependancies
               run: |
-                  su
-                  apt update
+                  sudo apt update
                   # installing libgit2
-                  apt install cmake
+                  sudo apt install cmake
                   # OpenSSL. Used by libgit2. Might be better to build this from source as well?
-                  apt install libssl-dev
+                  sudo apt install libssl-dev
                   # Used by libgit2 to find packages, such like libssh2
-                  apt install pkg-config
+                  sudo apt install pkg-config
                   git clone --depth=1 -b libssh2-1.9.0 https://github.com/libssh2/libssh2.git ~/libssh2_src
                   cd ~/libssh2_src
                   # Important: build as shared library using -DBUILD_SHARED_LIBS=ON
                   cmake . -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DCMAKE_INSTALL_PREFIX=~/libssh2
-                  cmake --build . --target install
+                  sudo cmake --build . --target install
                   # move bins to shared system libs folders so they can be found by libgit2
-                  cp -r ~/libssh2/* /usr/bin
-                  cp -r ~/libssh2/* /usr/local
+                  sudo cp -r ~/libssh2/* /usr/bin
+                  sudo cp -r ~/libssh2/* /usr/local
                   ldconfig
                   git clone --depth=1 -b v1.0.0 https://github.com/libgit2/libgit2.git ~/libgit2_src
                   cd ~/libgit2_src
                   cmake . -DBUILD_CLAR=OFF -DCMAKE_BUILD_TYPE=Release -DEMBED_SSH_PATH=~/libssh2_src -DCMAKE_INSTALL_PREFIX=~/libgit2
-                  cmake --build . --target install
+                  sudo cmake --build . --target install
                   # move bins to shared system libs folders so they can be found when you import pygit2
-                  cp -r ~/libgit2/* /usr/bin
-                  cp -r ~/libgit2/* /usr/local
+                  sudo cp -r ~/libgit2/* /usr/bin
+                  sudo cp -r ~/libgit2/* /usr/local
                   ldconfig
                   unset LIBGIT2
                   # hopefull have it now
