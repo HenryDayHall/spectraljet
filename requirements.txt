@@ -1,7 +1,7 @@
 # required python packages, installed by pip3
 # could probably relax the version requirements
 # works under python 3.6.9
-awkward1 >= 0.4.5
+awkward1 == 0.4.5
 uproot >= 4.0.6
 numpy >= 1.16.1
 matplotlib >= 3.1.2
