@@ -1,7 +1,7 @@
 import subprocess
 from spectraljet import FormJets
 import numpy as np
-import awkward as ak
+import awkward1 as ak
 import os
 
 def compile_fastjet():

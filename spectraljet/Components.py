@@ -3,7 +3,7 @@ import inspect
 import pyarrow
 import pickle
 import os
-import awkward as ak
+import awkward1 as ak
 import uproot
 import numpy as np
 from . import Constants, InputTools, TypeTools

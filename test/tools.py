@@ -3,7 +3,7 @@ import numpy as np
 #import collections
 #from ipdb import set_trace as st
 import os
-import awkward as ak
+import awkward1 as ak
 import pickle
 
 dir_name = os.path.dirname(os.path.abspath(__file__))

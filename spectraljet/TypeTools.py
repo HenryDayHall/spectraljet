@@ -1,6 +1,6 @@
 import numpy as np
 import functools
-import awkward as ak
+import awkward1 as ak
 
 def is_stringy(x):
     if isinstance(x, (str, ak.behaviors.string.StringBehavior)):

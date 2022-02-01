@@ -6,7 +6,7 @@ from numpy import testing as tst
 import pytest
 from spectraljet import Components, PDGNames
 from test.tools import generic_equality_comp, TempTestDir, data_dir
-import awkward as ak
+import awkward1 as ak
 
 class AwkdArrays:
     empty = ak.from_iter([])
