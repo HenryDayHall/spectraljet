@@ -21,7 +21,7 @@ def restring(x):
     return x
 
 
-class StringyArray(ak.awkward.Array):
+class StringyArray(ak.Array):
     """Variation on awkward arrays which respects strings"""
     def __getitem__(self, key):
         item = super().__getitem__(key)
