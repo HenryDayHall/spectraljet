@@ -3,7 +3,7 @@ import scipy.spatial
 import pytest
 import warnings
 import os
-import awkward1 as ak
+import awkward as ak
 from test.tools import TempTestDir
 import numpy as np
 from numpy import testing as tst

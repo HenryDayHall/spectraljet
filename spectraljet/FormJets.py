@@ -6,7 +6,7 @@ import bisect
 from . import Components, Constants
 import scipy.spatial
 import scipy.linalg
-import awkward1 as ak
+import awkward as ak
 
 
 def knn(distances, num_neighbours):
