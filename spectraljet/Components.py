@@ -1,4 +1,5 @@
 """Low level components, format apes that of root """
+import ast
 import inspect
 import pyarrow
 import pickle
@@ -314,22 +315,61 @@ def update_awkward0_to_1(old_path, new_path=None, delete_old=True, start=0, end=
                     new_data["gitdict_" + key] = ak.from_iter([value])
             else:
                 try:
-                    updated = ak.from_awkward0(value[section])[np.newaxis]
+                    updated = ak.from_awkward0(value[section])
                 except TypeError:
-                    updated = ak.from_iter([value])
+                    updated = ak.from_iter(value)
                 new_data[key] = ak.to_regular(updated)
         if not only_preselected:
-            columns = [name for name in new_data["column_order"][0] if name in found]
-            hyper_parameters = [name for name in new_data["hyperparameter_column_order"][0] if name in found]
+            columns = [name for name in new_data["column_order"] if name in found]
+            hyper_parameters = [name for name in new_data["hyperparameter_column_order"] if name in found]
         new_data["column_order"] = ak.to_regular(ak.from_iter([columns]))
-        new_data["hyperparameter_column_order"] = ak.to_regular(ak.from_iter([hyper_parameters]))
+        new_data["hyperparameter_column_order"] = ak.to_regular(ak.from_iter(hyper_parameters))
         print("All keys processed", flush=True)
         new_data = ak.zip(new_data, depth_limit=1)
     if new_path is not None:
-        ak.to_parquet(new_data, new_path)
+        safe_dict_to_parquet(new_data, new_path)
         if delete_old:
             os.remove(old_path)
     return new_data
+
+
+def safe_dict_to_parquet(to_save, save_path):
+    new_dict = {}
+    for field in to_save:
+        array = to_save[field]
+        if isinstance(array, str):
+            new_dict[field] = ['string_str', array]
+        elif not hasattr(array, '__iter__'):
+            new_dict[field] = ['single_str', str(array)]
+        elif ak.count(array) == 0:
+            new_dict[field] = ['list_str', str(ak.to_list(array))]
+        else:
+            new_dict[field] = [[], array]
+    ak.to_parquet(new_dict, save_path)
+
+
+def safe_parquet_to_dict(save_path):
+    readout = ak.from_parquet(save_path)
+    new_dict = {}
+    for key in ak.fields(readout):
+        save_mode, content = readout[key]
+        try:
+            is_string = save_mode == 'string_str'
+            is_single = save_mode == 'single_str'
+            is_list = save_mode == 'list_str'
+        except ValueError:
+            is_list = is_single = is_string = False
+        if is_string:
+            array = TypeTools.restring(content)
+        elif is_single:
+            array = ast.literal_eval(content)
+        elif is_list:
+            as_list = ast.literal_eval(content)
+            array = ak.Array(as_list)
+        else:
+            array = content
+        new_dict[key] = array
+    return new_dict
 
 
 class EventWise:
@@ -375,20 +415,15 @@ class EventWise:
         else:
             self.hyperparameter_columns = []
         if isinstance(contents, ak.highlevel.Array):
-            self._column_contents = contents
+            self._column_contents = {key: contents[key]
+                                     for key in ak.fields(contents)}
         else:
-            self._column_contents = {}
             if contents is not None:
-                for key, value in contents.items():
-                    try:
-                        value = ak.from_iter(value)[np.newaxis]
-                    except TypeError:
-                        value = ak.from_iter([value])
-                    self._column_contents[key] = value
+                self._column_contents = contents
+                for key in columns:  # these are expected to be array like
+                    self._column_contents[key] = ak.from_iter(contents[key])
             else:
-                self._column_contents['placeholder'] = ak.from_iter([[]])
-            self._column_contents = ak.zip(self._column_contents,
-                                           depth_limit=1)
+                self._column_contents = {'placeholder': ak.from_iter([])}
         assert len(set(self.columns)) == len(self.columns),\
             f"Duplicates in columns; {self.columns}"
         self._alias_dict = self._gen_alias()
@@ -407,15 +442,15 @@ class EventWise:
             keys are the alias names values are the name to which the alias refers
         """
         alias_dict = {}
-        if 'alias' in ak.fields(self._column_contents):
-            for row in self._column_contents.alias[0]:
+        if 'alias' in self._column_contents:
+            for row in self._column_contents['alias']:
                 # akward arrays can have odd unhashable types
                 alias = str(row[0])
                 target = str(row[1])
                 alias_dict[alias] = target
                 self.columns.append(alias)
         else:  # alias is not in column contents
-            self._column_contents['alias'] = ak.from_iter([[]])
+            self._column_contents['alias'] = ak.from_iter([])
         return alias_dict
 
     def _remove_alias(self, to_remove):
@@ -429,13 +464,13 @@ class EventWise:
             alisas name to remove
 
         """
-        alias_keys = list(self._column_contents.alias[0, :, 0])
-        alias_list = list(self._column_contents.alias[0])
+        alias_keys = list(self._column_contents['alias'][:, 0])
+        alias_list = list(self._column_contents['alias'])
         alias_idx = alias_keys.index(to_remove)
         # if to_remove is not infact an alias the line above will throw an error
         del self._alias_dict[to_remove]
         del alias_list[alias_idx]
-        self._column_contents['alias'] = ak.from_iter([alias_list])
+        self._column_contents['alias'] = ak.from_iter(alias_list)
         self.columns.remove(to_remove)
 
     def add_alias(self, name, target):
@@ -451,9 +486,9 @@ class EventWise:
         """
         assert target in self.columns
         assert name not in self.columns
-        alias_list = self._column_contents.alias[0].tolist()
+        alias_list = self._column_contents['alias'].to_list()
         alias_list.append([name, target])
-        self._column_contents['alias'] = ak.from_iter([alias_list])
+        self._column_contents['alias'] = ak.from_iter(alias_list)
         self._alias_dict[name] = target
         self.columns.append(name)
 
@@ -476,10 +511,10 @@ class EventWise:
         attr_name = self._alias_dict.get(attr_name, attr_name)
         if attr_name in self.columns:
             if self.selected_event is None:
-                return self._column_contents[attr_name][0]
-            return self._column_contents[attr_name][0][self.selected_event]
+                return self._column_contents[attr_name]
+            return self._column_contents[attr_name][self.selected_event]
         if attr_name in self.hyperparameter_columns:
-            return TypeTools.restring(self._column_contents[attr_name][0])
+            return self._column_contents[attr_name]
         raise AttributeError(f"{self.__class__.__name__} does not have {attr_name}")
 
     def __dir__(self):
@@ -518,34 +553,16 @@ class EventWise:
                            if c not in self._alias_dict]
         hyperparameter_column_order = ak.from_iter(non_alias_hcols)
         # must happen in this order so the new column order overwrites the old
-        self._column_contents['column_order'] = column_order[np.newaxis]
+        self._column_contents['column_order'] = column_order
         self._column_contents['hyperparameter_column_order'] =\
-            hyperparameter_column_order[np.newaxis]
+            hyperparameter_column_order
         if update_git_properties:
             self.git_properties.update_latest()
         # as the gitdict has varing types, it is easiest
         # to treat it in the same manner as the hyper parameters
         for key, value in self.git_properties.gitdict.items():
-            self._column_contents["gitdict_" + key] = ak.from_iter([value])
-        try:
-            ak.to_parquet(self._column_contents, path)
-        except pyarrow.ArrowNotImplementedError as e:
-            # check if you have already recursed?
-            previous_call = inspect.stack()[1].function
-            this_call = inspect.stack()[0].function
-            if previous_call == this_call:
-                print("Recusive attempt failed")
-                raise e
-            print(f"Pyarrow got itself into a tizz trying to save {self.file_name}")
-            print(e)
-            print("Will recreate the EventWise and try again")
-            self.selected_event = None
-            clean_content = {col: [getattr(self, col)]
-                             for col in self.columns +
-                             self.hyperparameter_columns}
-            new_ew = EventWise(self.path_name, self.columns, clean_content,
-                               self.hyperparameter_columns)
-            new_ew.write()
+            self._column_contents["gitdict_" + key] = value
+        safe_dict_to_parquet(self._column_contents, path)
 
     @classmethod
     def pottential_file(cls, file_name):
@@ -574,13 +591,13 @@ class EventWise:
                   f"will attempt to update {path} to {new_path}")
             update_awkward0_to_1(path, new_path)
             path = new_path
-        contents = ak.from_parquet(path)
-        columns = list(contents['column_order'][0])
+        contents = safe_parquet_to_dict(path)
+        columns = list(contents['column_order'])
         hyperparameter_columns =\
-            list(contents['hyperparameter_column_order'][0])
+            list(contents['hyperparameter_column_order'])
         gitdict_prefix = "gitdict_"
         len_prefix = len(gitdict_prefix)
-        gitdict = {key[len_prefix:]: contents[key][0]
+        gitdict = {key[len_prefix:]: contents[key]
                    for key in ak.fields(contents)
                    if key.startswith(gitdict_prefix)}
         if not gitdict:  # the file format is outdated
@@ -620,8 +637,7 @@ class EventWise:
             for key in new_content:
                 if not isinstance(new_content[key], ak.highlevel.Array):
                     new_content[key] = ak.from_iter(new_content[key])
-                self._column_contents[key] = \
-                    ak.to_regular(new_content[key][np.newaxis])
+                self._column_contents[key] = new_content[key]
             self.write(update_git_properties=True)
 
     def append_hyperparameters(self, **new_content):
@@ -649,7 +665,7 @@ class EventWise:
                     self.remove(name)
             self.hyperparameter_columns += new_columns
             for key in new_columns:
-                self._column_contents[key] = ak.from_iter([new_content[key]])
+                self._column_contents[key] = new_content[key]
             self.write(update_git_properties=True)
 
     def remove(self, col_name):
@@ -671,16 +687,17 @@ class EventWise:
                 self.hyperparameter_columns.remove(col_name)
             else:
                 raise KeyError(f"Don't have a column called {col_name}")
-            columns_to_keep = [name for name in
-                               ak.fields(self._column_contents)
+            columns_to_keep = [name for name in self._column_contents
                                if name != col_name]
-            self._column_contents = self._column_contents[columns_to_keep]
+            new_column_contents = {}
+            for key in columns_to_keep:
+                new_column_contents[key] = self._column_contents[key]
+            self._column_contents = new_column_contents
 
     def remove_prefix(self, col_prefix):
         """
         Delete all columns and hyperparameter_columns that begin with the 
         given prefix. Does not write.
-        PŘEDNÁŠEJÍCÍ NA UNIVERZITĚ
 
         Parameters
         ----------
@@ -720,10 +737,12 @@ class EventWise:
             else:
                 raise KeyError(f"Don't have a column called {old_name}")
             self._column_contents[new_name] = self._column_contents[old_name]
-            columns_to_keep = [name for name in
-                               ak.fields(self._column_contents)
+            columns_to_keep = [name for name in self._column_contents
                                if name != old_name]
-            self._column_contents = self._column_contents[columns_to_keep]
+            new_column_contents = {}
+            for key in columns_to_keep:
+                new_column_contents[key] = self._column_contents[key]
+            self._column_contents = new_column_contents
 
     def rename_prefix(self, old_prefix, new_prefix):
         """
@@ -920,13 +939,13 @@ class EventWise:
             # if a list of per event compoenents are given
             # it should eb verified that they are all the same length
             to_check = set(per_event_component[1:])
-            per_event_component = per_event_component[0]
+            n_events = len(getattr(self, per_event_component[0]))
         else:
             to_check = set()
-        n_events = len(getattr(self, per_event_component))
+            n_events = len(getattr(self, per_event_component))
         # work out which lists have this property
         per_event_cols = [c for c in self.columns
-                          if len(self._column_contents[c][0]) == n_events]
+                          if len(self._column_contents[c]) == n_events]
         assert to_check.issubset(per_event_cols)
         new_contents = []
         if upper_bounds is None:  # treat lower bounds as a list of indices
@@ -935,7 +954,7 @@ class EventWise:
                     # append none as a placeholder
                     new_contents.append(None)
                 else:
-                    new_content = {k: self._column_contents[k][0, index_list]
+                    new_content = {k: self._column_contents[k][index_list]
                                    for k in per_event_cols}
                     new_contents.append(new_content)
         else:
@@ -946,7 +965,7 @@ class EventWise:
                     # append none as a placeholder
                     new_contents.append(None)
                 else:
-                    new_content = {k: self._column_contents[k][0, lower:upper]
+                    new_content = {k: self._column_contents[k][lower:upper]
                                    for k in per_event_cols}
                     new_contents.append(new_content)
         # if no dupes only put the unchanged content in the first event
@@ -955,10 +974,10 @@ class EventWise:
         i = 0
         add_unsplit = True
         # add the hyperparameters to all things...
-        hyper_param_dict = {name: self._column_contents[name][0] for
+        hyper_param_dict = {name: self._column_contents[name] for
                             name in self.hyperparameter_columns}
-        unchanged_parts = {k: self._column_contents[k][0] for k in
-                           ak.fields(self._column_contents)
+        unchanged_parts = {k: self._column_contents[k] for k in
+                           self._column_contents
                            if k not in per_event_cols and
                            k not in hyper_param_dict}
         for new_content in new_contents:
@@ -1041,19 +1060,17 @@ class EventWise:
                                  check_weighted_average,
                                  check_wanted):
         # check hyperparameters match and add as needed
-        found_hcols = set(getattr(content_here,
-                                  "hyperparameter_column_order",
-                                  [[]])[0])
+        found_hcols = set(content_here.get("hyperparameter_column_order", []))
         # if we cannot find a column order try Event_n
         column_name = str(getattr(
-                       content_here, "column_order", [["Event_n"]])[0][0])
+                       content_here, "column_order", ["Event_n"])[0])
         # if we cannot fnd the column return 1
-        segment_length = len(getattr(content_here, column_name, [[None]])[0])
+        segment_length = len(getattr(content_here, column_name, [None]))
         if found_hcols:  # check they are the same here
             for name in found_hcols:
                 if not check_wanted(name):
                     continue
-                hyper_here = content_here[name][0]
+                hyper_here = content_here[name]
                 if isinstance(hyper_here, ak.behaviors.string.StringBehavior):
                     hyper_here = ''.join(hyper_here)
                 if name not in existing_hyper:
@@ -1091,7 +1108,7 @@ class EventWise:
                             content_here, contents_collected,
                             pickle_strs, check_wanted,
                             check_for_dups=False):
-        for name in content_here['column_order'][0]:
+        for name in content_here['column_order']:
             if check_wanted(name) and name not in existing_columns:
                 existing_columns.append(name)
                 # add padding
@@ -1104,15 +1121,15 @@ class EventWise:
                 contents_collected[key].append([])  # placeholder
             elif check_for_dups:
                 if key not in pickle_strs:
-                    pickle_strs[key] = pickle.dumps(content_here[key][0])
-                    contents_collected[key].append(content_here[key][0])
+                    pickle_strs[key] = pickle.dumps(content_here[key])
+                    contents_collected[key].append(content_here[key])
                 elif pickle_strs[key] !=\
-                        pickle.dumps(content_here[key][0]):
-                    contents_collected[key].append(content_here[key][0])
+                        pickle.dumps(content_here[key]):
+                    contents_collected[key].append(content_here[key])
                 else:  # need to add a placeholder
                     contents_collected[key].append([])
             else:
-                contents_collected[key].append(content_here[key][0])
+                contents_collected[key].append(content_here[key])
         return existing_columns, contents_collected
 
     @classmethod
@@ -1120,7 +1137,7 @@ class EventWise:
         # if it's possible to order the contents correctly, do so
         if "Event_n" in contents:
             # assume that each fragment contains a continuous set of events
-            start_point = [numbering[0] for numbering in contents["Event_n"]]
+            start_point = contents["Event_n"][:, 0]
             order = np.argsort(start_point)
             for key in columns:
                 contents[key] = ak.flatten(contents[key][order])
@@ -1197,7 +1214,7 @@ class EventWise:
                 if fragment.endswith(cls.OLD_FILE_EXTENTION):
                     content_here = update_awkward0_to_1(fragment)
                 else:
-                    content_here = ak.from_parquet(fragment)
+                    content_here = safe_parquet_to_dict(fragment)
             except Exception as e:
                 print(f"Problem in {fragment}, skipping,\n{e}")
                 continue
@@ -1225,11 +1242,11 @@ class EventWise:
                     continue
                 if check_wanted(key):
                     if key not in pickle_strs:
-                        contents[key] = content_here[key][0]
-                        pickle_strs[key] = pickle.dumps(content_here[key][0])
+                        contents[key] = content_here[key]
+                        pickle_strs[key] = pickle.dumps(content_here[key])
                     else:
                         assert pickle_strs[key] == \
-                            pickle.dumps(content_here[key][0]), \
+                            pickle.dumps(content_here[key]), \
                             f"What's {key}?"
         if len(contents) == 0:
             raise RuntimeError(f"Didn't find any contents in {fragments}")
@@ -1846,7 +1863,7 @@ class RootReadout(EventWise):
             self._insert_inf_rapidities()
             self._fix_Tower_NTimeHits()
             self._remove_Track_Birr()
-        contents = {key: value[0] for key, value in
+        contents = {key: value for key, value in
                     self._column_contents.items()}
         super().__init__(file_name, columns=self.columns, contents=contents)
 
@@ -1906,7 +1923,7 @@ class RootReadout(EventWise):
                     attr_names[index] += str(n)
         assert len(set(attr_names)) == len(attr_names), "Duplicates in columns; "+\
                 f"{[n for i, n in enumerate(attr_names) if n in attr_names[i+1:]]}"
-        new_column_contents = {name: all_arrays[key][np.newaxis]
+        new_column_contents = {name: all_arrays[key]
                                for key, name in zip(full_keys, attr_names)}
         self._column_contents = {**new_column_contents, **self._column_contents}
         # make this a list for fixed order
@@ -1925,12 +1942,12 @@ class RootReadout(EventWise):
         self.columns.append(name)
         to_tracks = self._reflect_references("Track_Particle",
                                              shape_ref, depth=1)
-        self._column_contents[name] = to_tracks[np.newaxis]
+        self._column_contents[name] = to_tracks
         name = "Particle_Tower"
         self.columns.append(name)
         to_towers = self._reflect_references("Tower_Particles",
                                              shape_ref, depth=2)
-        self._column_contents[name] = to_towers[np.newaxis]
+        self._column_contents[name] = to_towers
 
     def _recursive_to_id(self, jagged_array):
         """
@@ -1949,24 +1966,23 @@ class RootReadout(EventWise):
         results : iterable
             output of conversion attempt, same shape as jagged_array
         """
+        # if we get this far, there are trefs in the array
         results = []
-        is_tRef = True  # an empty list is assumed to be a tRef list
         for item in jagged_array:
-            if hasattr(item, '__iter__'):
+            if hasattr(item, 'ref'):
+                # the trefs are 1 indexed not 0 indexed, so subtract 1
+                results.append(item.ref - 1)
+            elif hasattr(item, 'refs'):
+                # the trefs are 1 indexed not 0 indexed, so subtract 1
+                results.append(item.refs - 1)
+            elif hasattr(item, '__iter__') and not isinstance(item, str):
                 is_tRef, sub_results = self._recursive_to_id(item)
                 if not is_tRef:
-                    # cut losses and return up the stack now
-                    return is_tRef, results
-                results.append(sub_results)
-            else:
-                # the trefs are 1 indexed not 0 indexed, so subtract 1
-                if hasattr(item, 'ref'):
-                    results.append(item.ref - 1)
-                elif hasattr(item, 'refs'):
-                    results.append(item.refs - 1)
-                else:
                     return False, results
-        return is_tRef, results
+            else:  # whatever it is, it's not a tref
+                # we can skip the rest
+                return False, results
+        return True, results
 
     def _reflect_references(self, reference_col, target_shape_col, depth=1):
         """
@@ -2018,13 +2034,13 @@ class RootReadout(EventWise):
         pt = self.PT
         pz = self.Pz
         birr = np.sqrt(pt**2 + pz**2)
-        self._column_contents["Birr"] = birr[np.newaxis]
+        self._column_contents["Birr"] = birr
 
     def _fix_Tower_NTimeHits(self):
         """ """
         particles = self.Tower_Particles
         times_hit = apply_array_func(len, particles)
-        self._column_contents["Tower_NTimeHits"] = times_hit[np.newaxis]
+        self._column_contents["Tower_NTimeHits"] = times_hit
 
     def _insert_inf_rapidities(self):
         """ use np.inf not 999.9 for infinity, replace this number with np.inf"""

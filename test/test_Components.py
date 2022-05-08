@@ -1,7 +1,6 @@
 import numpy as np
 import spectraljet
 import os
-#from ipdb import set_trace as st
 from numpy import testing as tst
 import pytest
 from spectraljet import Components, PDGNames
@@ -564,8 +563,8 @@ def test_combine():
         content_2 = ak.from_iter(np.random.rand(n_events))
         content_3 = ak.from_iter([np.random.rand(np.random.randint(5)) for _ in range(n_events)])
         content_4 = ak.from_iter([[ak.from_iter(np.random.rand(np.random.randint(5)))
-                                       for _ in range(np.random.randint(5))]
-                                      for _ in range(n_events)])
+                                   for _ in range(np.random.randint(5))]
+                                  for _ in range(n_events)])
         hyper = AwkdArrays.one_one
         ew.append(Event_n=content_1, c2=content_2, c3=content_3, c4=content_4)
         ew.append_hyperparameters(Hyper=hyper)
