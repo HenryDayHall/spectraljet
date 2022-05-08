@@ -501,8 +501,6 @@ def test_embedding_angular2():
                                   [np.pi, np.pi, np.pi/2, np.inf]])**2)
 
 
-
-
 # class Agglomerative
 
 def set_JetInputs(eventWise, floats):
@@ -967,7 +965,8 @@ def test_Spectral_embedding_distance2():
                      [2, 1, -1, -1, 0],
                      [1, -1, 2, 0, 1]])
     floats = np.zeros((3, len(FormJets.Agglomerative.float_columns)))
-    params = {"ExpofPTFormatEmbedding": "genkt", "ExpofPTEmbedding": 2}
+    params = {"ExpofPTFormatEmbedding": "genkt", "ExpofPTEmbedding": 2,
+              "EmbedDistance": 'euclidiean' }
     spect = FormJets.Spectral((ints, floats), memory_cap=10,
                               dict_jet_params=params)
     spect.setup_internal()
@@ -976,8 +975,9 @@ def test_Spectral_embedding_distance2():
     raw_distances, distances = spect._embedding_distance2(space, pt=pt)
     expected = np.zeros((3, 3))
     np.fill_diagonal(expected, np.inf)
-    tst.assert_allclose(raw_distances, expected)
-    tst.assert_allclose(distances, expected)
+    # square roots reduce max accuracy
+    tst.assert_allclose(raw_distances, expected, atol=1e-5)
+    tst.assert_allclose(distances, expected, atol=1e-5)
     # more complex space
     space = np.arange(3).reshape((3, 1))
     raw_distances, distances = spect._embedding_distance2(space, pt=pt)
@@ -987,7 +987,8 @@ def test_Spectral_embedding_distance2():
     tst.assert_allclose(expected, raw_distances)
     tst.assert_allclose(expected, distances)
     # try without the kt factor, but with a SingularitySuppression
-    params = {"ExpofPTFormatEmbedding": None, "SingularitySuppression": 1}
+    params = {"ExpofPTFormatEmbedding": None, "SingularitySuppression": 1,
+              "EmbedDistance": 'euclidiean' }
     spect = FormJets.Spectral((ints, floats), memory_cap=10,
                               dict_jet_params=params)
     spect.setup_internal()
