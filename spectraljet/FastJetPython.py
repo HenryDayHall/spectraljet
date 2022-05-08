@@ -1,11 +1,13 @@
 import subprocess
-from spectraljet import FormJets
+from . import FormJets
 import numpy as np
 import awkward as ak
 import os
 
+__DIRECTORY = os.path.dirname(os.path.realpath(__file__))
+
 def compile_fastjet():
-    os.chdir("spectraljet")
+    os.chdir(__DIRECTORY)
     output = subprocess.run("g++ applyFastJet.cc -o applyFastJet `/usr/local/bin/fastjet-config --cxxflags --libs --plugins`", 
                             shell=True,
                             capture_output=True)
@@ -15,7 +17,9 @@ def compile_fastjet():
 
 
 def run_applyfastjet(eventWise, DeltaR, algorithm_num, jet_name,
-                     program_path="./spectraljet/applyFastJet"):
+                     program_path=None):
+    if program_path is None:
+         program_path = os.path.join(__DIRECTORY, "applyFastJet")
     input_lines = produce_summary(eventWise)
     output_lines = _run_applyfastjet(input_lines, str(DeltaR),
                                      str(algorithm_num), program_path)
@@ -49,7 +53,8 @@ def produce_summary(eventWise):
     return '\n'.join(rows).encode()
 
 
-def _run_applyfastjet(input_lines, DeltaR, algorithm_num, program_path="./spectraljet/applyFastJet", tries=0):
+def _run_applyfastjet(input_lines, DeltaR, algorithm_num, program_path=None, 
+                      tries=0):
     """
     Run applyfastjet, sending the provided input lines to stdin
     Helper function for run_FastJet
@@ -64,7 +69,7 @@ def _run_applyfastjet(input_lines, DeltaR, algorithm_num, program_path="./spectr
         number indicating the algorithm to use
     program_path : string
         path to call the program at
-        (Default value = "./src/applyFastJet")
+        (Default value = "__DIRECTORY/applyFastJet")
     tries : int
         number of tries with this input
         (Default value = 0)
@@ -266,7 +271,7 @@ def read_fastjet(arg, jet_name="FastJet", do_checks=False):
 
 
 if __name__ == "__main__":
-    from spectraljet import Components
+    from . import Components
     from matplotlib import pyplot as plt
     eventWise = Components.EventWise.from_file("../megaIgnore/lightHiggs/00_01_signal.parquet")
     eventWise.selected_event = 0
