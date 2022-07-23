@@ -1,5 +1,5 @@
 """ module to test the Constants.py module """
-from spectraljet import Constants
+from ..spectraljet import Constants
 import numpy as np
 import pytest
 

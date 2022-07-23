@@ -1,28 +1,11 @@
 import numpy as np
-import spectraljet
 import os
 from numpy import testing as tst
 import pytest
-from spectraljet import Components, PDGNames
+from ..spectraljet import Components, PDGNames
 from test.tools import generic_equality_comp, TempTestDir, data_dir
+from test.micro_samples import AwkdArrays
 import awkward as ak
-
-class AwkdArrays:
-    empty = ak.from_iter([])
-    one_one = ak.from_iter([1])
-    minus_plus = ak.from_iter(np.arange(-2, 3))
-    event_ints = ak.from_iter([[1, 2], [3]])
-    jet_ints = ak.from_iter([ak.from_iter([[1, 2], [3]]),
-                             ak.from_iter([[4,5,6]])])
-    event_floats = ak.from_iter([[.1, .2], [.3]])
-    jet_floats = ak.from_iter([ak.from_iter([[.1, .2], [.3]]),
-                               ak.from_iter([[.4,.5,.6]])])
-    empty_event = ak.from_iter([[], [1]])
-    empty_jet = ak.from_iter([ak.from_iter([[], [1]]),
-                              ak.from_iter([[2, 3]])])
-    empty_events = ak.from_iter([[], []])
-    empty_jets = ak.from_iter([ak.from_iter([[],[]]),
-                               ak.from_iter([[]])])
 
 
 def test_flatten():

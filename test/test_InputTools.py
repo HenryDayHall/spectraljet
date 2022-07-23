@@ -4,7 +4,7 @@ from contextlib import contextmanager
 from test.tools import TempTestDir
 import os
 import io
-from spectraljet import InputTools
+from ..spectraljet import InputTools
 import unittest.mock
 #from ipdb import set_trace as st
 import numpy.testing as tst

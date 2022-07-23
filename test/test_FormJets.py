@@ -5,49 +5,12 @@ import warnings
 import os
 import awkward as ak
 from test.tools import TempTestDir
+from test.micro_samples import SimpleClusterSamples
 import numpy as np
 from numpy import testing as tst
-from spectraljet import FormJets
-from spectraljet import Components
-from spectraljet import FastJetPython
-
-
-class SimpleClusterSamples:
-    config_1 = {'DeltaR': 1., 'ExpofPTMultiplier': 0}
-    config_2 = {'DeltaR': 1., 'ExpofPTMultiplier': 1}
-    config_3 = {'DeltaR': 1., 'ExpofPTMultiplier': -1}
-    config_4 = {'DeltaR': .4, 'ExpofPTMultiplier': 0}
-    config_5 = {'DeltaR': .4, 'ExpofPTMultiplier': 1}
-    config_6 = {'DeltaR': .4, 'ExpofPTMultiplier': -1}
-    # there is no garantee on left right child order, or global order of pseudojets
-    unitless = True   # do we work with a unitless version of distance
-    empty_inp = {'ints': np.array([]).reshape((-1, 5)), 'floats': np.array([]).reshape((-1, 8))}
-    one_inp = {'ints': np.array([[0, -1, -1, -1, -1]]),
-               'floats': np.array([[1., 0., 0., 1., 1., 0., 0., 0., 0.]])}
-    two_degenerate = {'ints': np.array([[0, -1, -1, -1, -1],
-                                        [1, -1, -1, -1, -1]]),
-                      'floats': np.array([[1., 0., 0., 1., 1., 0., 0., 0., 0.],
-                                          [1., 0., 0., 1., 1., 0., 0., 0., 1.]])}
-    degenerate_join = {'ints': np.array([[0, 2, -1, -1, -1],
-                                         [1, 2, -1, -1, -1],
-                                         [2, -1, 0, 1, 0]]),
-                       'floats': np.array([[1., 0., 0., 1., 1., 0., 0., 0., 0.],
-                                           [1., 0., 0., 1., 1., 0., 0., 0., 1.],
-                                           [2., 0., 0., 2., 2., 0., 0., 0., 1.]])}
-    two_close = {'ints': np.array([[0, -1, -1, -1, -1],
-                                   [1, -1, -1, -1, -1]]),
-                 'floats': np.array([[1., 0., 0., 1., 1., 0., 0., 0., 1.],
-                                     [1., 0., 0.1, 1., np.cos(0.1), np.sin(0.1), 0., 0., 1.]])}
-    close_join = {'ints': np.array([[0, 2, -1, -1, -1],
-                                    [1, 2, -1, -1, -1],
-                                    [2, -1, 0, 1, 0]]),
-                  'floats': np.array([[1., 0., 0., 1., 1., 0., 0., 0., 1.],
-                                      [1., 0., 0.1, 1., np.cos(0.1), np.sin(0.1), 0., 0., 1.],
-                                      [2.*np.cos(0.05), 0., 0.05, 2., 1. + np.cos(0.1), np.sin(0.1), 0., 0.1, 2.]])}
-    two_oposite = {'ints': np.array([[0, -1, -1, -1, -1],
-                                     [1, -1, -1, -1, -1]]),
-                   'floats': np.array([[1., 0., 0., 1., 1., 0., 0., 0., 0.],
-                                       [1., 0., np.pi, 1., -1., 0., 0., 0., 0.]])}
+from ..spectraljet import FormJets
+from ..spectraljet import Components
+from ..spectraljet import FastJetPython
 
 
 def match_ints(ints1, ints2):
@@ -89,6 +52,18 @@ def match_ints_floats(ints1, floats1, ints2, floats2, compare_distance=True,
     floats1 = floats1[:, :-2]
     floats2 = floats2[:, :-2]
     tst.assert_allclose(floats1, floats2, atol=0.0005, err_msg="Floats don't match")
+
+
+def set_JetInputs(eventWise, floats):
+    columns = ["JetInputs_" + name for name in FormJets.Agglomerative.float_columns
+               if "Distance" not in name]
+    if len(floats):
+        contents = {name: ak.from_iter([floats[:, i]]) for i, name in enumerate(columns)}
+    else:
+        contents = {name: ak.from_iter([[]]) for i, name in enumerate(columns)}
+    columns.append("JetInputs_SourceIdx")
+    contents["JetInputs_SourceIdx"] = ak.from_iter([np.arange(len(floats))])
+    eventWise.append(**contents)
 
 
 # setup and test indervidual methods inside the jet classes
@@ -502,18 +477,6 @@ def test_embedding_angular2():
 
 
 # class Agglomerative
-
-def set_JetInputs(eventWise, floats):
-    columns = ["JetInputs_" + name for name in FormJets.Agglomerative.float_columns
-               if "Distance" not in name]
-    if len(floats):
-        contents = {name: ak.from_iter([floats[:, i]]) for i, name in enumerate(columns)}
-    else:
-        contents = {name: ak.from_iter([[]]) for i, name in enumerate(columns)}
-    columns.append("JetInputs_SourceIdx")
-    contents["JetInputs_SourceIdx"] = ak.from_iter([np.arange(len(floats))])
-    eventWise.append(**contents)
-
 
 def test_Agglomerative_setup_ints_floats():
     """ Create the _ints and _floats, along with 
