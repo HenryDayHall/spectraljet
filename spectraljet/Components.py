@@ -362,7 +362,10 @@ def safe_parquet_to_dict(save_path):
         if is_string:
             array = TypeTools.restring(content)
         elif is_single:
-            array = ast.literal_eval(content)
+            if content in ('nan', 'inf'):
+                array = getattr(np, content)
+            else:
+                array = ast.literal_eval(content)
         elif is_list:
             as_list = ast.literal_eval(content)
             array = ak.Array(as_list)

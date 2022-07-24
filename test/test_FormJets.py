@@ -4,8 +4,8 @@ import pytest
 import warnings
 import os
 import awkward as ak
-from test.tools import TempTestDir
-from test.micro_samples import SimpleClusterSamples
+from .tools import TempTestDir
+from .micro_samples import SimpleClusterSamples
 import numpy as np
 from numpy import testing as tst
 from ..spectraljet import FormJets

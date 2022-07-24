@@ -3,8 +3,8 @@ import os
 from numpy import testing as tst
 import pytest
 from ..spectraljet import Components, PDGNames
-from test.tools import generic_equality_comp, TempTestDir, data_dir
-from test.micro_samples import AwkdArrays
+from .tools import generic_equality_comp, TempTestDir, data_dir
+from .micro_samples import AwkdArrays
 import awkward as ak
 
 
@@ -1104,24 +1104,24 @@ def test_even_length():
         file_name = "blank.parquet"
         blank_ew = Components.EventWise(os.path.join(dir_name, file_name))
         # should have no effect on a blank eventWise
-        Components.check_even_length(blank_ew, False, True)
+        Components.check_even_length(blank_ew, True)
         assert len(blank_ew.columns) == 0
         assert len(blank_ew.hyperparameter_columns) == 0
         # should not remove anything from a valid eventWise
         contents = {"Thing_A": AwkdArrays.jet_ints, "Thing_B": AwkdArrays.jet_floats}
         blank_ew.append(**contents)
-        Components.check_even_length(blank_ew, False, True)
+        Components.check_even_length(blank_ew, True)
         assert generic_equality_comp(blank_ew.Thing_A, contents["Thing_A"])
         assert generic_equality_comp(blank_ew.Thing_B, contents["Thing_B"])
         # should throw errors with one column the wrong length
         wrong_content = {"Wrong_A": AwkdArrays.jet_ints[:1], "Wrong_B": AwkdArrays.jet_floats}
         blank_ew.append(**wrong_content)
         with pytest.raises(ValueError):
-            Components.check_even_length(blank_ew, False, True)
+            Components.check_even_length(blank_ew, True)
         # should not raise an error if told to ignore the prefix
-        Components.check_even_length(blank_ew, False, True, ["Wrong"])
+        Components.check_even_length(blank_ew, True, ["Wrong"])
         # should remove the prefix if not in interactive mode and not throwing errors
-        Components.check_even_length(blank_ew, False, False)
+        Components.check_even_length(blank_ew, False)
         assert len(blank_ew.columns) == 2, f"Expected [Thing_A, Thing_B], found {blank_ew.columns}"
         assert generic_equality_comp(blank_ew.Thing_A, contents["Thing_A"])
         assert generic_equality_comp(blank_ew.Thing_B, contents["Thing_B"])
@@ -1136,26 +1136,26 @@ def test_check_no_tachions():
         file_name = "blank.parquet"
         blank_ew = Components.EventWise(os.path.join(dir_name, file_name))
         # should have no effect on a blank eventWise
-        Components.check_no_tachions(blank_ew, False, True)
+        Components.check_no_tachions(blank_ew, True)
         assert len(blank_ew.columns) == 0
         assert len(blank_ew.hyperparameter_columns) == 0
         # should not remove anything from a valid eventWise
         contents = {"Thing_Energy": energies, "Thing_Px": px,
-                "Thing_Py": py, "Thing_Pz": pz}
+                    "Thing_Py": py, "Thing_Pz": pz}
         blank_ew.append(**contents)
-        Components.check_no_tachions(blank_ew, False, True)
+        Components.check_no_tachions(blank_ew, True)
         assert generic_equality_comp(blank_ew.Thing_Energy, energies)
         assert generic_equality_comp(blank_ew.Thing_Px, px)
         assert generic_equality_comp(blank_ew.Thing_Py, py)
         assert generic_equality_comp(blank_ew.Thing_Pz, pz)
         # should throw errors with one column the wrong length
-        blank_ew.append(Thing_Pz = bad_pz)
+        blank_ew.append(Thing_Pz=bad_pz)
         with pytest.raises(ValueError):
-            Components.check_no_tachions(blank_ew, False, True)
+            Components.check_no_tachions(blank_ew, True)
         # should not raise an error if told to ignore the prefix
-        Components.check_no_tachions(blank_ew, False, True, ["Thing"])
+        Components.check_no_tachions(blank_ew, True, ["Thing"])
         # should remove the prefix if not in interactive mode and not throwing errors
-        Components.check_no_tachions(blank_ew, False, False)
+        Components.check_no_tachions(blank_ew, False)
         assert len(blank_ew.columns) == 0
 
 
