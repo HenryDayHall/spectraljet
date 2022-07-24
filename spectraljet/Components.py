@@ -7,7 +7,7 @@ import os
 import awkward as ak
 import uproot
 import numpy as np
-from . import Constants, InputTools, TypeTools
+from . import Constants, TypeTools
 import pygit2
 
 
@@ -2134,21 +2134,17 @@ def fix_nonexistent_columns(eventWise):
     return h_problems, eventWise
 
 
-def check_even_length(eventWise, interactive=True, raise_error=False, ignore_prefixes=None):
+def check_even_length(eventWise, raise_error=False, ignore_prefixes=None):
     """
     Check that all the items in the list of columns contain the same
     number of events (i.e. have the same length). either delete or
     raise errors for columns with the wrong length.
-    Has interactive mode. Doesn't write changes.
-    No return value, works in place.
+    Doesn't write changes. No return value, works in place.
 
     Parameters
     ----------
     eventWise : EventWise
         data to check
-    interactive : bool
-        Should the user be asked about changes?
-         (Default value = True)
     raise_error : bool
         Should the function raise an error
         instead of deleteing columns of the wrong length?
@@ -2163,11 +2159,6 @@ def check_even_length(eventWise, interactive=True, raise_error=False, ignore_pre
         ignore_prefixes = []
     column_lengths = {name: len(getattr(eventWise, name)) for name in eventWise.columns}
     max_len = np.max(list(column_lengths.values()), initial=0)
-    if interactive and not InputTools.yesNo_question(
-            f"Max length is {max_len}, require this length? "):
-        max_len = InputTools.get_literal("What should the length be? ")
-    ask_apply_same_choice = 0
-    apply_to_prefix = True
     prefix_to_remove = []
     for name, length in column_lengths.items():
         remove = False
@@ -2183,23 +2174,13 @@ def check_even_length(eventWise, interactive=True, raise_error=False, ignore_pre
             problem = f"Column {name} has {length} items, (should be {max_len})"
             if raise_error:
                 raise ValueError(problem)
-            if interactive:
-                print(problem)
-                remove = InputTools.yesNo_question("Remove this column? ")
-                apply_to_prefix = InputTools.yesNo_question(
-                    f"Apply this choice to all columns with prefix '{prefix}'? ")
-                ask_apply_same_choice += 1
-                if ask_apply_same_choice % 5 == 0:
-                    interactive = not InputTools.yesNo_question(
-                        "Do you want to apply this choice to all future columns? ")
-            else:
-                remove = True
-                prefix_to_remove.append(prefix)
+            remove = True
+            prefix_to_remove.append(prefix)
         if remove:
             eventWise.remove(name)
 
 
-def check_no_tachions(eventWise, interactive=True, raise_error=False, ignore_prefixes=None, relaxation=0.0001):
+def check_no_tachions(eventWise, raise_error=False, ignore_prefixes=None, relaxation=0.0001):
     """
     Check no objects in an eventwise appear to go faster than light.
     Works in place, dosn't write changes to disk.
@@ -2208,9 +2189,6 @@ def check_no_tachions(eventWise, interactive=True, raise_error=False, ignore_pre
     ----------
     eventWise : EventWise
         data to check
-    interactive : bool
-        Ask user before changing data
-         (Default value = True)
     raise_error : bool
         Raise an error insead of deleteing the columns
         when a tachyon is found.
@@ -2232,7 +2210,6 @@ def check_no_tachions(eventWise, interactive=True, raise_error=False, ignore_pre
                 ignore_prefixes[i] += '_'
     energy_prefixes = [name[:-len('Energy')] for name in eventWise.columns
                        if name.endswith('Energy')]
-    ask_apply_same_choice = 0
     for prefix in energy_prefixes:
         if prefix in ignore_prefixes:
             continue
@@ -2256,15 +2233,7 @@ def check_no_tachions(eventWise, interactive=True, raise_error=False, ignore_pre
         problem = f"Prefix {prefix} is tachyonic with min rest mass {min_restmass2}"
         if raise_error:
             raise ValueError(problem)
-        if interactive:
-            print(problem)
-            remove = InputTools.yesNo_question("Remove this column? ")
-            ask_apply_same_choice += 1
-            if ask_apply_same_choice % 5 == 0:
-                interactive = not InputTools.yesNo_question(
-                    "Do you want to apply this choice to all future prefixes? ")
-        else:
-            remove = True
+        remove = True
         if remove:
             eventWise.remove_prefix(prefix)
 
