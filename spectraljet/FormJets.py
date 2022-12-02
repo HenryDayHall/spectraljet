@@ -90,7 +90,18 @@ class Custom_KMeans:
             for cluster_n in range(n_clusters):
                 points_here = self.points[allocations==cluster_n]
                 if len(points_here):  # otherwise leave the centeriod where it was
+                    
+                    
+                    # I believe this is the part we need to change so that the centroid lives
+                    # on the surface of the hypersphere. 
+                    
                     centeroid = np.nanmean(points_here, axis=0)
+
+
+
+
+
+
                     if not np.all(centeroid == 0):
                         # all 0 centeroid breaks the cross product thing,
                         # and just indicates that the points in this cluster

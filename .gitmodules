@@ -1,0 +1,3 @@
+[submodule "Differentiable-Frechet-Mean"]
+	path = Differentiable-Frechet-Mean
+	url = https://github.com/CUAI/Differentiable-Frechet-Mean
