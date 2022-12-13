@@ -80,4 +80,4 @@ ax.set_ylabel("Phi")
 for jet in seperate_jets:
     ax.scatter(jet.Leaf_Rapidity, jet.Leaf_Phi, alpha=0.5, s=20*np.log(jet.Leaf_PT))
 ax.set_title("Clustered jets")
-
+plt.show()
