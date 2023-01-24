@@ -1,5 +1,5 @@
 import subprocess
-from . import FormJets
+import FormJets
 import numpy as np
 import awkward as ak
 import os

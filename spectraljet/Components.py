@@ -7,7 +7,7 @@ import os
 import awkward as ak
 import uproot
 import numpy as np
-from . import Constants, TypeTools
+import Constants, TypeTools
 import pygit2
 
 

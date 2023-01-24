@@ -3,7 +3,7 @@ import time
 from matplotlib import pyplot as plt
 from matplotlib.ticker import MaxNLocator
 import bisect
-from . import Components, Constants
+import Components, Constants
 import scipy.spatial
 import scipy.linalg
 import awkward as ak

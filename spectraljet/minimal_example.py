@@ -1,5 +1,5 @@
 import numpy as np
-from spectraljet import Components, FormJets
+import Components, FormJets
 ### minimal example of clusterng an event into jets
 
 # create some data
