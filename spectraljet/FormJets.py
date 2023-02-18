@@ -2506,6 +2506,8 @@ def cluster_multiapply(eventWise, cluster_algorithm, dict_jet_params={},
             if algorithm == cluster_algorithm:
                 jet_name = name
                 break
+    if not jet_name.endswith("Jet"):
+        jet_name += "Jet"
     additional_parameters = {}
     additional_parameters["jet_name"] = jet_name
     additional_parameters["run"] = True
