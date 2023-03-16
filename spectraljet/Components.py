@@ -423,8 +423,8 @@ class EventWise:
         else:
             if contents is not None:
                 self._column_contents = contents
-                for key in columns:  # these are expected to be array like
-                    self._column_contents[key] = ak.from_iter(contents[key])
+#                for key in columns:  # these are expected to be array like
+#                    self._column_contents[key] = ak.from_iter(contents[key])
             else:
                 self._column_contents = {'placeholder': ak.from_iter([])}
         assert len(set(self.columns)) == len(self.columns),\
