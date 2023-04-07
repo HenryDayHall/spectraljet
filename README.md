@@ -46,8 +46,8 @@ Setting up and making some dummy data from a pretend event;
 ```python3
 import numpy as np
 from spectraljet import Components, FormJets
-particle_pxs = np.array([99.38, 23.83, 15.44, 35.53, 91.63, 97.01, 40.14, 23.39, 60.08, 69.84])
-particle_pys = np.array([90.21, 0.82, 24.83, 75.09, 81.73, 71.23, 68.33, 48.03, 94.47, 14.47])
+particle_pxs = np.array([9.38, 2.83, 1.44, 35.53, 9.63, 9.01, 40.14, 23.39, 60.08, 6.84])
+particle_pys = np.array([9.21, 0.82, 2.83, 7.09, 8.73, 71.23, 6.33, 4.03, 9.47, 14.47])
 particle_pzs = np.array([15.90, 5.11, 9.03, 83.61, 34.53, 52.26, 52.26, 91.19, 56.76, 5.39])
 particle_energies = np.array([321.36, 145.06, 515.77, 739.28, 695.15, 616.06, 366.81, 557.71, 510.49, 518.79])
 ```
