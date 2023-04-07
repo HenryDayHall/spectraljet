@@ -1,5 +1,7 @@
 ![Run python tests](https://github.com/HenryDayHall/spectraljet/actions/workflows/ci.yml/badge.svg)
 [![codecov](https://codecov.io/gh/HenryDayHall/spectraljet/branch/master/graph/badge.svg?token=RYDQA14HN9)](https://codecov.io/gh/HenryDayHall/spectraljet)
+[![DOI](https://zenodo.org/badge/454169021.svg)](https://zenodo.org/badge/latestdoi/454169021)
+
 # Spectral clustering
 
 A python algorithm for doing spectral clustering on jets.
@@ -106,3 +108,5 @@ ax.set_title("Clustered jets")
 
 This should result in a plot like;
 ![scatter plot of formed jet](examples/example.png)
+
+
