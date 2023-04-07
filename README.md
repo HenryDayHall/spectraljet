@@ -48,8 +48,8 @@ import numpy as np
 from spectraljet import Components, FormJets
 particle_pxs = np.array([9.38, 2.83, 1.44, 35.53, 9.63, 9.01, 40.14, 23.39, 60.08, 6.84])
 particle_pys = np.array([9.21, 0.82, 2.83, 7.09, 8.73, 71.23, 6.33, 4.03, 9.47, 14.47])
-particle_pzs = np.array([15.90, 5.11, 9.03, 83.61, 34.53, 52.26, 52.26, 91.19, 56.76, 5.39])
-particle_energies = np.array([321.36, 145.06, 515.77, 739.28, 695.15, 616.06, 366.81, 557.71, 510.49, 518.79])
+particle_pzs = np.array([115.90, 53.11, 9.03, 83.61, 634.53, 572.26, 52.26, 91.19, 56.76, 185.39])
+particle_energies = np.array([171.36, 245.06, 55.77, 1739.28, 995.15, 616.06, 366.81, 1557.71, 510.49, 518.79])
 ```
 
 Define the parameters of the clustering algorithm
