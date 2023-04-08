@@ -1,14 +1,11 @@
 # required python packages, installed by pip3
 # could probably relax the version requirements
-# works under python 3.6.9
-# must be exactly this version of awkward
-# any other version either has issues with pyarrow
-# or has issues with projecting empty arrays
-awkward == 1.2.0
+# works under python 3.11
+awkward >= 2.1
 # it's rather awkward
 uproot >= 4.0.6
 numpy >= 1.16.1
 matplotlib >= 3.1.2
 scipy >= 1.3.3
-pygit2 == 1.5.0
-pyarrow == 3.0.0
+pygit2 >= 1.5.0
+pyarrow >= 3.0.0
