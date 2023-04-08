@@ -1,11 +1,13 @@
 """ module to test the Constants.py module """
 
-import sys
-from pathlib import Path
-path_root1 = Path(__file__).parents[1]
-sys.path.append(str(path_root1))
+# Provided the package is run as a module, this shouldn't be needed.
+# try calling with `pytest` from the directory above
+# import sys
+# from pathlib import Path
+# path_root1 = Path(__file__).parents[1]
+# sys.path.append(str(path_root1))
 
-from spectraljet import Constants
+from ..spectraljet import Constants
 import numpy as np
 import pytest
 
