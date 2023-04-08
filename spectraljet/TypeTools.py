@@ -85,8 +85,12 @@ def soft_equality(a, b):
     b_iterable = is_non_str_iterable(b)
     if not (is_stringy(a) or is_stringy(b)):
         try:
-            aa = np.array(ak.to_list(a)) if a_iterable else a
-            bb = np.array(ak.to_list(b)) if b_iterable else b
+            # old awkward 1.8.0 way
+            #aa = np.array(ak.to_list(a)) if a_iterable else a
+            #bb = np.array(ak.to_list(b)) if b_iterable else b
+            # TODO fix this in awkward
+            aa = np.array(list(a)) if a_iterable else a
+            bb = np.array(list(b)) if b_iterable else b
             return np.isclose(aa, bb, equal_nan=True)
         except TypeError:
             pass
