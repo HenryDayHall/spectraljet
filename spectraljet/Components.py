@@ -127,7 +127,10 @@ def _apply_array_func(func, depth, *nested):
     else:
         for parts in zip(*nested):
             out.append(_apply_array_func(func, depth-1, *parts))
-    return out
+    try:
+        return ak.from_iter(out)
+    except TypeError:
+        return out
 
 
 def confine_angle(angle):
