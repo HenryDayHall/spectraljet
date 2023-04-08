@@ -1,4 +1,8 @@
 """ Module to test the new FormJets module """
+import sys
+from pathlib import Path
+path_root1 = Path(__file__).parents[1]
+sys.path.append(str(path_root1))
 import scipy.spatial
 import pytest
 import warnings
@@ -8,9 +12,9 @@ from .tools import TempTestDir
 from .micro_samples import SimpleClusterSamples
 import numpy as np
 from numpy import testing as tst
-from ..spectraljet import FormJets
-from ..spectraljet import Components
-from ..spectraljet import FastJetPython
+from spectraljet import FormJets
+from spectraljet import Components
+from spectraljet import FastJetPython
 
 
 def match_ints(ints1, ints2):

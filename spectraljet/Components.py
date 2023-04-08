@@ -333,6 +333,44 @@ def update_awkward0_to_1(old_path, new_path=None, delete_old=True, start=0, end=
     return new_data
 
 
+def typify(my_array):
+    """
+    Ensure that an array, even an empty one, has a propper nullable type.
+    Important for saving with pyarrow.
+
+    Parameters
+    ----------
+    my_array : awkward.Array
+        The array that must have a type.
+
+    Returns
+    -------
+    my_array : awkward.Array
+        The array formatted so it is guaranteed a type.
+    """
+    array_type = my_array.type
+    depth = 0
+    # decide if the array has a proper type, and also ascertain the depth.
+    # depending on the version of awkward, the array type might nest using
+    # the attribute 'content' or 'type'
+    while hasattr(array_type, 'content'):
+        depth += 1
+        array_type = array_type.content
+    while hasattr(array_type, 'type'):
+        depth += 1
+        array_type = array_type.type
+    # If the array doesn't have a proper type
+    if ak.types.UnknownType() == array_type:
+        # make a dummy item to give it a type
+        dummy_item = [0]
+        for _ in range(depth):
+            dummy_item = [dummy_item]
+        as_list = my_array.to_list()
+        typed_array = ak.Array(as_list + dummy_item)
+        # then cut the dummy item away again
+        my_array = typed_array[:-1]
+    return my_array
+
 def safe_dict_to_parquet(to_save, save_path):
     new_dict = {}
     for field in to_save:
@@ -341,10 +379,13 @@ def safe_dict_to_parquet(to_save, save_path):
             new_dict[field] = ['string_str', array]
         elif not hasattr(array, '__iter__'):
             new_dict[field] = ['single_str', str(array)]
-        elif ak.count(array) == 0:
+        elif np.sum(ak.count(array)) == 0:
+            # the array has at least one element
+            # as opposed to being an empty nested list
             new_dict[field] = ['list_str', str(ak.to_list(array))]
         else:
-            new_dict[field] = [[], array]
+            new_dict[field] = typify(ak.Array([[], array]))
+    new_dict = ak.Record(new_dict)
     ak.to_parquet(new_dict, save_path)
 
 
@@ -353,12 +394,12 @@ def safe_parquet_to_dict(save_path):
     new_dict = {}
     for key in ak.fields(readout):
         save_mode, content = readout[key]
-        try:
+        if len(save_mode) == 0:
+            is_list = is_single = is_string = False
+        else:
             is_string = save_mode == 'string_str'
             is_single = save_mode == 'single_str'
             is_list = save_mode == 'list_str'
-        except ValueError:
-            is_list = is_single = is_string = False
         if is_string:
             array = TypeTools.restring(content)
         elif is_single:
@@ -641,7 +682,8 @@ class EventWise:
                 if not isinstance(new_content[key], ak.highlevel.Array):
                     new_content[key] = ak.from_iter(new_content[key])
                 self._column_contents[key] = new_content[key]
-            self.write(update_git_properties=True)
+            # TODO was there a reason to disable the git records?
+            self.write(update_git_properties=True) 
 
     def append_hyperparameters(self, **new_content):
         """
@@ -1309,8 +1351,7 @@ def event_matcher(eventWise1, eventWise2):
     isint = np.array([isinstance(col, (np.integer, int))
                       for col in column_sample])
     int_cols = common_columns[isint]
-    isfloat = np.array([isinstance(col, (np.float, float))
-                        for col in column_sample])
+    isfloat = np.array([isinstance(col, float) for col in column_sample])
     float_cols = common_columns[isfloat]
     assert "Event_n" in common_columns
     length1 = len(eventWise1.Event_n)
@@ -1625,9 +1666,10 @@ def ptpze_to_rapidity(pt_list, pz_list, e_list):
     pt2_use = np.array(pt_list)[to_calculate]**2
     m2 = np.clip(e_use**2 - pz_use**2 - pt2_use, 0, None)
     mag_rapidity = 0.5*np.log((pt2_use + m2)/((e_use - np.abs(pz_use))**2))
-    rapidity[to_calculate] = mag_rapidity
+    rapidity[..., to_calculate] = mag_rapidity
     with np.errstate(invalid='ignore'):
-        rapidity *= ak.to_numpy(np.sign(pz_list))
+        #rapidity *= np.sign(pz_list) # cause TypeError: operand type(s) all returned NotImplemented from __array_ufunc__
+        rapidity = rapidity * np.sign(pz_list)
     if not hasattr(pt_list, '__iter__'):
         rapidity = float(rapidity)
     return rapidity

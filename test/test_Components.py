@@ -1,8 +1,13 @@
+import sys
+from pathlib import Path
+path_root1 = Path(__file__).parents[1]
+sys.path.append(str(path_root1))
+
 import numpy as np
 import os
 from numpy import testing as tst
 import pytest
-from ..spectraljet import Components, PDGNames
+from spectraljet import Components, PDGNames
 from .tools import generic_equality_comp, TempTestDir, data_dir
 from .micro_samples import AwkdArrays
 import awkward as ak
@@ -1180,4 +1185,35 @@ def test_find_eventWise_in_dir():
         assert len(found) == len(paths), f"expected {paths}, found {found}"
         for ew in found:
             assert ew.path_name in paths
+
+
+def test_typify():
+    # check that empty arrays are given a type and don't change shape
+    empty0 = ak.Array([])
+    typed0 = Components.typify(empty0)
+    assert 'unknown' not in str(typed0.type)
+    assert len(typed0) == 0
+    empty1 = ak.Array([[]])
+    typed1 = Components.typify(empty1)
+    assert 'unknown' not in str(typed1.type)
+    assert len(typed1) == 1
+    assert len(typed1[0]) == 0
+    empty2 = ak.Array([[[]], []])
+    typed2 = Components.typify(empty2)
+    assert 'unknown' not in str(typed2.type)
+    assert len(typed2) == 2
+    assert len(typed2[0]) == 1
+    assert len(typed2[0][0]) == 0
+    assert len(typed2[1]) == 0
+    # check that an array that has a type is not altered
+    full3 = ak.Array([6])
+    typed3 = Components.typify(full3)
+    assert full3 == typed3
+    assert full3.type == typed3.type
+    full4 = ak.Array([6.5])
+    typed4 = Components.typify(full4)
+    assert full4 == typed4
+    assert full4.type == typed4.type
+
+
 
