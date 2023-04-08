@@ -2425,10 +2425,7 @@ def filter_jets(eventWise, jet_name, min_jetpt=None, min_ntracks=None):
     empty = ak.from_iter([])
     for pts, child1s in zip(jet_pt, jet_child1):
         pts = ak.flatten(pts)
-        try:
-            lead_jet = np.argmax(pts)
-        except ValueError:  # no pts in older version of awkward
-            lead_jet = None
+        lead_jet = np.argmax(pts)
         if lead_jet == None:
             jet_idxs.append(empty)
             continue
