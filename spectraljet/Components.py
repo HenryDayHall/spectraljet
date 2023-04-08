@@ -127,14 +127,7 @@ def _apply_array_func(func, depth, *nested):
     else:
         for parts in zip(*nested):
             out.append(_apply_array_func(func, depth-1, *parts))
-    try:
-        #TODO move this logic to generic_equality_comp
-        if type(ak.from_iter(out)) == np.int64:
-            return int(ak.from_iter(out))
-        else:
-            return ak.from_iter(out)
-    except TypeError:
-        return out
+    return out
 
 
 def confine_angle(angle):
@@ -383,12 +376,12 @@ def safe_dict_to_parquet(to_save, save_path):
             new_dict[field] = ['string_str', array]
         elif not hasattr(array, '__iter__'):
             new_dict[field] = ['single_str', str(array)]
-        elif len(array) == 0:
+        elif ak.count(array) == 0:  # TODO was there a reason to change this to len?
             new_dict[field] = ['list_str', str(ak.to_list(array))]
         else:
             new_dict[field] = typify(ak.Array([[], array]))
-    
-    new_dict = ak.Record(new_dict)
+    # TODO is this needed? 
+    #new_dict = ak.Record(new_dict)
 
     ak.to_parquet(new_dict, save_path)
 
@@ -398,15 +391,12 @@ def safe_parquet_to_dict(save_path):
     new_dict = {}
     for key in ak.fields(readout):
         save_mode, content = readout[key]
-        try:
-            if len(save_mode) == 0:
-             is_list = is_single = is_string = False
-            else:
-                is_string = save_mode == 'string_str'
-                is_single = save_mode == 'single_str'
-                is_list = save_mode == 'list_str'
-        except ValueError:
+        if len(save_mode) == 0:
             is_list = is_single = is_string = False
+        else:
+            is_string = save_mode == 'string_str'
+            is_single = save_mode == 'single_str'
+            is_list = save_mode == 'list_str'
         if is_string:
             array = TypeTools.restring(content)
         elif is_single:
@@ -689,7 +679,7 @@ class EventWise:
                 if not isinstance(new_content[key], ak.highlevel.Array):
                     new_content[key] = ak.from_iter(new_content[key])
                 self._column_contents[key] = new_content[key]
-            self.write(update_git_properties=False)
+            self.write(update_git_properties=True)  # TODO was there a reason to disable this?
 
     def append_hyperparameters(self, **new_content):
         """
