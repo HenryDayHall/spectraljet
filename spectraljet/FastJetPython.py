@@ -181,7 +181,7 @@ def read_fastjet(arg, jet_name="FastJet", do_checks=False):
             fast_idx_dict[line_idx] = label
     fast_idx_dict[-1] = -1
     fast_ints = np.vectorize(fast_idx_dict.__getitem__,
-                             otypes=[np.float])(
+                             otypes=[float])(
                                 fast_ints[:, [icolumns["pseudojet_id"],
                                               icolumns["parent_id"],
                                               icolumns["child1_id"],

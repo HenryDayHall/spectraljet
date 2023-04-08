@@ -379,13 +379,13 @@ def safe_dict_to_parquet(to_save, save_path):
             new_dict[field] = ['string_str', array]
         elif not hasattr(array, '__iter__'):
             new_dict[field] = ['single_str', str(array)]
-        elif ak.count(array) == 0:  # TODO was there a reason to change this to len?
+        elif np.sum(ak.count(array)) == 0:
+            # the array has at least one element
+            # as opposed to being an empty nested list
             new_dict[field] = ['list_str', str(ak.to_list(array))]
         else:
             new_dict[field] = typify(ak.Array([[], array]))
-    # TODO is this needed? 
-    #new_dict = ak.Record(new_dict)
-
+    new_dict = ak.Record(new_dict)
     ak.to_parquet(new_dict, save_path)
 
 
@@ -682,7 +682,8 @@ class EventWise:
                 if not isinstance(new_content[key], ak.highlevel.Array):
                     new_content[key] = ak.from_iter(new_content[key])
                 self._column_contents[key] = new_content[key]
-            self.write(update_git_properties=True)  # TODO was there a reason to disable this?
+            # TODO was there a reason to disable the git records?
+            self.write(update_git_properties=True) 
 
     def append_hyperparameters(self, **new_content):
         """
@@ -1350,8 +1351,7 @@ def event_matcher(eventWise1, eventWise2):
     isint = np.array([isinstance(col, (np.integer, int))
                       for col in column_sample])
     int_cols = common_columns[isint]
-    isfloat = np.array([isinstance(col, (np.float, float))
-                        for col in column_sample])
+    isfloat = np.array([isinstance(col, float) for col in column_sample])
     float_cols = common_columns[isfloat]
     assert "Event_n" in common_columns
     length1 = len(eventWise1.Event_n)
