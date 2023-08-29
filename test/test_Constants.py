@@ -1,5 +1,11 @@
 """ module to test the Constants.py module """
-from ..spectraljet import Constants
+
+import sys
+from pathlib import Path
+path_root1 = Path(__file__).parents[1]
+sys.path.append(str(path_root1))
+
+from spectraljet import Constants
 import numpy as np
 import pytest
 

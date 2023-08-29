@@ -11,6 +11,7 @@ data_dir = os.path.join(dir_name, "../mini_data")
 
 
 def generic_equality_comp(x, y):
+    #TODO add a way to deal with np.int64 vs int cases
     """ an atempt to generalise checking equality """
     strx = pickle.dumps(x)
     stry = pickle.dumps(y)
