@@ -629,9 +629,7 @@ class EventWise:
             list(contents['hyperparameter_column_order'])
         gitdict_prefix = "gitdict_"
         len_prefix = len(gitdict_prefix)
-        gitdict = {key[len_prefix:]: contents[key]
-                   for key in ak.fields(contents)
-                   if key.startswith(gitdict_prefix)}
+        gitdict = {}
         if not gitdict:  # the file format is outdated
             gitdict = 'old'
         # the contents have the one dim 0th axis, so add them later

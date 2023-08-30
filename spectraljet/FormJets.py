@@ -1944,8 +1944,6 @@ class Partitional(Clustering):
                                 for row in start_ints], dtype=int)
         # at worst, each point gets it's own cluster
         max_elements = n_inputs + n_unclustered
-        if max_elements == 0:
-            raise ValueError("Max elements is zero.")
         assert max_elements <= self.memory_cap, \
             f"More particles ({n_inputs}) than possible " +\
             f"with this memory_cap ({self.memory_cap})"
@@ -2629,18 +2627,23 @@ def cluster_multiapply(eventWise, cluster_algorithm, dict_jet_params={},
                                      dict_jet_params=dict_jet_params,
                                      **additional_parameters)
             end_time = time.time()
-        except np.linalg.LinAlgError:  # we can just ignore this event
-            duration.append(np.nan)
-            jet_list.append(None)
-            if not silent:
-                print(f"LinAlgError in event {event_n}")
+        except (np.linalg.LinAlgError, ValueError) as e:  # handle multiple exceptions in a tuple
+            # Handle the specific broadcasting ValueError
+            if isinstance(e, ValueError) and str(e) == "could not broadcast input array from shape (0) into shape (0,5)":
+                duration.append(np.nan)
+                jet_list.append(None)
+                if not silent:
+                    print(f"ValueError (broadcasting issue) in event {event_n}")
+            # Handle the LinAlgError
+            elif isinstance(e, np.linalg.LinAlgError):
+                duration.append(np.nan)
+                jet_list.append(None)
+                if not silent:
+                    print(f"LinAlgError in event {event_n}")
+            else:
+                raise
             continue
         
-        except ValueError as e:  # new exception handling
-            if str(e) == "Max elements is zero.":  # if the error message matches
-                print('Max elements is zero, event might be empty? Skipping...')
-                continue  # break out of the loop
-
 
         duration.append(end_time - start_time)
         jet_list.append(jets)
