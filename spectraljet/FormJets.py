@@ -2539,13 +2539,18 @@ def get_jet_input_params():
     if hasattr(get_jet_input_params, "_results"):
         return get_jet_input_params._results
     stack = Clustering.__subclasses__()
+    
+    stack = [SGWT]  #TODO don't hardcode this
     params = set()
+
     while stack:
         jet_class = stack.pop()
         params.update(jet_class.permited_values.keys())
         stack += jet_class.__subclasses__()
+
     get_jet_input_params._results = params
     return params
+
 
 
 def cluster_multiapply(eventWise, cluster_algorithm, dict_jet_params={},
