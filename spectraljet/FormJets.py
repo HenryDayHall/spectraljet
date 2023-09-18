@@ -2538,7 +2538,6 @@ multiapply_input = cluster_classes
 def get_jet_input_params():
     if hasattr(get_jet_input_params, "_results"):
         return get_jet_input_params._results
-    stack = Clustering.__subclasses__()
     
     stack = [SGWT]  #TODO don't hardcode this
     params = set()
