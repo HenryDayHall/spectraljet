@@ -128,11 +128,12 @@ def _apply_array_func(func, depth, *nested):
         for parts in zip(*nested):
             out.append(_apply_array_func(func, depth-1, *parts))
     try:
-        #TODO move this logic to generic_equality_comp
-        if type(ak.from_iter(out)) == np.int64:
-            return int(ak.from_iter(out))
-        else:
-            return ak.from_iter(out)
+        return ak.from_iter(out)
+        ##TODO move this logic to generic_equality_comp
+        #if type(ak.from_iter(out)) == np.int64:
+        #    return int(ak.from_iter(out))
+        #else:
+        #    return ak.from_iter(out)
     except TypeError:
         return out
 
@@ -338,12 +339,31 @@ def update_awkward0_to_1(old_path, new_path=None, delete_old=True, start=0, end=
 
 
 def typify(my_array):
+    """
+    Ensure that an array, even an empty one, has a propper nullable type.
+    Important for saving with pyarrow.
+
+    Parameters
+    ----------
+    my_array : awkward.Array
+        The array that must have a type.
+
+    Returns
+    -------
+    my_array : awkward.Array
+        The array formatted so it is guaranteed a type.
+    """
     array_type = my_array.type
     depth = 0
     # decide if the array has a proper type, and also ascertain the depth.
+    # depending on the version of awkward, the array type might nest using
+    # the attribute 'content' or 'type'
     while hasattr(array_type, 'content'):
         depth += 1
         array_type = array_type.content
+    while hasattr(array_type, 'type'):
+        depth += 1
+        array_type = array_type.type
     # If the array doesn't have a proper type
     if ak.types.UnknownType() == array_type:
         # make a dummy item to give it a type
@@ -364,13 +384,13 @@ def safe_dict_to_parquet(to_save, save_path):
             new_dict[field] = ['string_str', array]
         elif not hasattr(array, '__iter__'):
             new_dict[field] = ['single_str', str(array)]
-        elif len(array) == 0:
+        elif np.sum(ak.count(array)) == 0:
+            # the array has at least one element
+            # as opposed to being an empty nested list
             new_dict[field] = ['list_str', str(ak.to_list(array))]
         else:
             new_dict[field] = typify(ak.Array([[], array]))
-    
     new_dict = ak.Record(new_dict)
-
     ak.to_parquet(new_dict, save_path)
 
 
@@ -670,7 +690,8 @@ class EventWise:
                 if not isinstance(new_content[key], ak.highlevel.Array):
                     new_content[key] = ak.from_iter(new_content[key])
                 self._column_contents[key] = new_content[key]
-            self.write(update_git_properties=False)
+            # TODO was there a reason to disable the git records?
+            self.write(update_git_properties=True) 
 
     def append_hyperparameters(self, **new_content):
         """
