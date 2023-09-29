@@ -399,15 +399,12 @@ def safe_parquet_to_dict(save_path):
     new_dict = {}
     for key in ak.fields(readout):
         save_mode, content = readout[key]
-        try:
-            if len(save_mode) == 0:
-             is_list = is_single = is_string = False
-            else:
-                is_string = save_mode == 'string_str'
-                is_single = save_mode == 'single_str'
-                is_list = save_mode == 'list_str'
-        except ValueError:
+        if len(save_mode) == 0:
             is_list = is_single = is_string = False
+        else:
+            is_string = save_mode == 'string_str'
+            is_single = save_mode == 'single_str'
+            is_list = save_mode == 'list_str'
         if is_string:
             array = TypeTools.restring(content)
         elif is_single:
@@ -1359,8 +1356,7 @@ def event_matcher(eventWise1, eventWise2):
     isint = np.array([isinstance(col, (np.integer, int))
                       for col in column_sample])
     int_cols = common_columns[isint]
-    isfloat = np.array([isinstance(col, (np.float, float))
-                        for col in column_sample])
+    isfloat = np.array([isinstance(col, float) for col in column_sample])
     float_cols = common_columns[isfloat]
     assert "Event_n" in common_columns
     length1 = len(eventWise1.Event_n)
