@@ -4,8 +4,10 @@ authors:
 - family-names: "Henry"
   given-names: "Day-Hall"
   orcid: "https://orcid.org/0000-0002-9710-2980"
+- family-names: "Kieran"
+  given-names: "Maguire"
 title: "Spectral Jet"
-version: 1.0.0
+version: 1.1.0
 doi: 10.5281/zenodo.7808583
-date-released: 2023-04-07
+date-released: 2023-09-29
 url: "https://github.com/HenryDayHall/spectraljet"

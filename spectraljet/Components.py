@@ -129,6 +129,11 @@ def _apply_array_func(func, depth, *nested):
             out.append(_apply_array_func(func, depth-1, *parts))
     try:
         return ak.from_iter(out)
+        ##TODO move this logic to generic_equality_comp
+        #if type(ak.from_iter(out)) == np.int64:
+        #    return int(ak.from_iter(out))
+        #else:
+        #    return ak.from_iter(out)
     except TypeError:
         return out
 
