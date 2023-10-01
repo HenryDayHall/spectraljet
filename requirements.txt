@@ -10,3 +10,4 @@ scipy >= 1.3.3
 pygit2 >= 1.5.0
 pyarrow >= 3.0.0
 fsspec  # for to_parquet
+pandas # some awkward versions need pandas, and don't specify it properly
