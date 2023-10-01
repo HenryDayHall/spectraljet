@@ -21,7 +21,7 @@ class SGWT(FormJets.Partitional):
 
     def setup_internal(self):
         """ Runs before allocate """
-        self.laplacien, self.l_max_val = sgwt_functions.make_L(
+        self.laplacien, self.l_max_val = SGWTFunctions.make_L(
                 self.Leaf_Rapidity, self.Leaf_Phi,
                 normalised=self.Normalised, s=self.Sigma)
 
@@ -34,7 +34,7 @@ class SGWT(FormJets.Partitional):
         # Cannot have more jets than input particles.
         max_jets = min(self.NRounds, len(self.Leaf_Rapidity))
 
-        l_idx = sgwt_functions.make_L_idx(self.Leaf_Rapidity, self.Leaf_Phi, self.Leaf_PT)
+        l_idx = SGWTFunctions.make_L_idx(self.Leaf_Rapidity, self.Leaf_Phi, self.Leaf_PT)
 
         # Precompute L_idx sum and its sorted indices
         seed_ordering = l_idx.sum(axis=0).argsort()
@@ -53,8 +53,8 @@ class SGWT(FormJets.Partitional):
                 unclustered_idx_pointer += 1
                 continue
 
-            _, wp_all = sgwt_functions.wavelet_approx(self.laplacien, 2, wavelet_mask)
-            wavelet_values = sgwt_functions.min_max_scale(np.array(wp_all[0])).flatten()
+            _, wp_all = SGWTFunctions.wavelet_approx(self.laplacien, 2, wavelet_mask)
+            wavelet_values = SGWTFunctions.min_max_scale(np.array(wp_all[0])).flatten()
             below_cutoff_indices = set(np.where(wavelet_values < self.Cutoff)[0])
             available_particles = set(np.where(available_mask)[0])
             labels = list(below_cutoff_indices & available_particles)
@@ -72,3 +72,5 @@ class SGWT(FormJets.Partitional):
 
         return jet_list
 
+FormJets.cluster_classes["SGWT"] = SGWT
+FormJets.multiapply_input["SGWT"] = SGWT

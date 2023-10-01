@@ -155,7 +155,7 @@ def kernel_abspline3(x, alpha, beta, t1, t2):
                   [1],
                   [t1**(-alpha) * alpha * t1**(alpha - 1)],
                   [-beta * t2**(-beta - 1) * t2**beta]])
-    a = np.linalg.lstsq(M, v)[0]
+    a = np.linalg.lstsq(M, v, rcond=None)[0]
 
     r1 = np.logical_and(x>=0, x<t1).nonzero()
     r2 = np.logical_and(x>=t1, x<t2).nonzero()
