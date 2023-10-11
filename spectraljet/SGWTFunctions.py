@@ -1,3 +1,4 @@
+import warnings
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.cm
@@ -7,6 +8,8 @@ import scipy
 import scipy.sparse.linalg as ssl
 from scipy.sparse import lil_matrix
 from scipy.optimize import fminbound
+
+from . import FormJets
 
 
 
@@ -216,7 +219,7 @@ def filter_design(l_max, N_scales, design_type='default', lp_factor=20,
 
 
 def cheby_coeff(g, m, N=None, arange=(-1,1)):
-    """ Compute Chebyshev coefficients of given function.
+    """ Compute Chebyshev coefficients of given function using numpy's chebfit.
 
     Parameters
     ----------
@@ -233,72 +236,75 @@ def cheby_coeff(g, m, N=None, arange=(-1,1)):
     if N is None:
         N = m+1
 
-    a1 = (arange[1] - arange[0]) / 2.0
-    a2 = (arange[1] + arange[0]) / 2.0
-    n = np.pi * (np.r_[1:N+1] - 0.5) / N
-    s = g(a1 * np.cos(n) + a2)
-    c = np.zeros(m+1)
-    for j in range(m+1):
-        c[j] = np.sum(s * np.cos(j * n)) * 2 / N
+    x = np.linspace(arange[0], arange[1], N)
+    y = g(x)
+    
+    c = np.polynomial.chebyshev.chebfit(x, y, m)
 
     return c
 
+def preprocess_coefficients(c):
+    """Preprocess coefficients to ensure they're in the correct format."""
+    # If c is a scalar or 1D list/array, convert to 2D array
+
+    if c ==[]:
+        raise ValueError("Coefficients are an empty list.")
+
+    if np.isscalar(c):
+        return np.array([[c]])
+    
+    # Check sizes of inner arrays of c and raise error if they differ
+    if isinstance(c, list) and any(isinstance(x, np.ndarray) for x in c):
+        sizes = [x.shape[0] for x in c if isinstance(x, np.ndarray)]
+        if len(set(sizes)) > 1:
+            raise ValueError("All inner arrays of c must be of the same size.")
+
+    if isinstance(c, (list, np.ndarray)) and np.ndim(c) == 1:
+        return np.array([c])
+    
+    # If c is a list of arrays, stack them
+    if isinstance(c, list) and any(isinstance(x, np.ndarray) for x in c):
+        if len(set(x.shape[0] for x in c)) > 1:
+            raise ValueError("All inner arrays of c must be of the same size.")
+        return np.vstack(c)
+
+    return c.astype(np.float64)
 
 def cheby_op(f, L, c, arange):
-    """Compute (possibly multiple) polynomials of laplacian (in Chebyshev
-    basis) applied to input.
+    """Compute (possibly multiple) polynomials of laplacian (in Chebyshev basis) applied to input."""
+    # Ensure everything is float type
+    f = f.astype(np.float64)
+    L = L.astype(np.float64)
 
-    Coefficients for multiple polynomials may be passed as a list. This
-    is equivalent to setting
-    r[0] = cheby_op(f, L, c[0], arange)
-    r[1] = cheby_op(f, L, c[1], arange)
-    ...
- 
-    but is more efficient as the Chebyshev polynomials of L applied to f can be
-    computed once and shared.
-
-    Parameters
-    ----------
-    f : input vector
-    L : graph laplacian (should be sparse)
-    c : Chebyshev coefficients. If c is a plain array, then they are
-       coefficients for a single polynomial. If c is a list, then it contains
-       coefficients for multiple polynomials, such  that c[j](1+k) is k'th
-       Chebyshev coefficient the j'th polynomial.
-    arange : interval of approximation
-
-    Returns
-    -------
-    r : If c is a list, r will be a list of vectors of size of f. If c is
-       a plain array, r will be a vector the size of f.    
-    """
-    if not isinstance(c, list) and not isinstance(c, tuple):
-        r = cheby_op(f, L, [c], arange)
-        return r[0]
-
-    N_scales = len(c)
-    M = np.array([coeff.size for coeff in c])
-    max_M = M.max()
+    c = preprocess_coefficients(c)
+    
+    N_scales, M = c.shape
 
     a1 = (arange[1] - arange[0]) / 2.0
     a2 = (arange[1] + arange[0]) / 2.0
 
     Twf_old = f
-    Twf_cur = (L*f - a2*f) / a1
-    r = [0.5*c[j][0]*Twf_old + c[j][1]*Twf_cur for j in range(N_scales)]
+    Twf_cur = (L.dot(f) - a2 * f) / a1
 
-    for k in range(1, max_M):
-        # This is the polynomial that approximates the Laplacian
-        Twf_new = (2/a1) * (L*Twf_cur - a2*Twf_cur) - Twf_old
+    # Preallocate results
+    results = [np.zeros_like(f) for _ in range(N_scales)]
+    for j in range(N_scales):
+        results[j] += 0.5 * c[j, 0] * Twf_old
+        if M > 1:
+            results[j] += c[j, 1] * Twf_cur
+
+    for k in range(2, M):
+        Twf_new = (2 / a1) * (L.dot(Twf_cur) - a2 * Twf_cur) - Twf_old
         for j in range(N_scales):
-            if 1 + k <= M[j] - 1:
-                #this is shifted chebyshev polynomial coeff at scale j
-                r[j] = r[j] + c[j][k+1] * Twf_new
+            results[j] += c[j, k] * Twf_new
 
-        Twf_old = Twf_cur
-        Twf_cur = Twf_new
+        Twf_old, Twf_cur = Twf_cur, Twf_new
 
-    return r, Twf_old
+    if np.all(L == 0):
+        warnings.warn("The Laplacian matrix L is all zeros.")
+        return [np.zeros_like(f) for _ in range(c.shape[0])], np.zeros_like(f)
+    
+    return results, Twf_old
 
 
 def framebounds(g, lmin, lmax):
@@ -328,6 +334,7 @@ def framebounds(g, lmin, lmax):
     B = np.max(sg2)
 
     return (A, B, sg2, x)
+
 
 def view_design(g, t, arange):
     """Plot the scaling and wavelet kernel.
@@ -435,75 +442,6 @@ def clean_axes(ax):
     return
 
 
-# TOD import
-def ca_distances2(rapidity, phi, rapidity_column=None, phi_column=None):
-    """ Distances in physical space according to the Cambridge Aachen metric.
-
-    Parameters
-    ----------
-    rapidity : array of float
-        Row of rapidity values.
-    phi : array of float
-        Row of phi values.
-    rapidity_column : 2d array of float (optional)
-        Column of rapidity values.
-        If not given, taken as the transpose of the row.
-    phi_column : 2d array of float (optional)
-        Column of phi values.
-        If not given, taken as the transpose of the row.
-
-    Returns
-    -------
-    distances2 : 2d array of float
-        Distances squared between points in the row and the column.
-    """
-    rapidity = np.array(rapidity)
-    phi = np.array(phi)
-
-    if rapidity_column is None:
-        rapidity_column = np.expand_dims(rapidity, 1)
-    rapidity_distances = np.abs(rapidity - rapidity_column)
-    if phi_column is None:
-        phi_column = np.expand_dims(phi, 1)
-    phi_distances = angular_distance(phi, phi_column)
-    distances2 = phi_distances ** 2 + rapidity_distances ** 2
-    return distances2
-
-
-#TODO import
-def angular_distance(a, b):
-    """
-    Get the shortest distance between a and b
-
-    Parameters
-    ----------
-    a : float or arraylike of floats
-        angle
-        
-    b : float or arraylike of floats
-        angle
-        
-
-    Returns
-    -------
-    : float or arraylike of floats
-        absolute distance between angles
-
-    """
-    raw = a - b
-    return np.min((raw%(2*np.pi), np.abs(-raw%(2*np.pi))), axis=0)
-
-# TODO import
-def make_kT_mat(y, phi, pT):
-    # exponent exp1 is -1 for anti-kT, 0 for deltaRmatrix (CA), 1 for kT
-    nparts = len(pT)
-    mat = np.zeros((nparts, nparts))
-    for i in range(nparts):
-        for j in range(i+1,nparts):
-                multiplier = 1/np.max((pT[i], pT[j]))
-                mat[i,j]=(multiplier*np.sqrt(2*(np.cosh(y[i] - y[j]) - np.cos(phi[i]-phi[j]))))
-    return 0.5 * (mat + mat.T)
-
 
 def make_L_idx(particle_rapidities, particle_phis, particle_pts):
     """ Makes mask for where to place wavelet in the particle array.
@@ -525,41 +463,14 @@ def make_L_idx(particle_rapidities, particle_phis, particle_pts):
     L_idx : distance array determined by the anti-kt metric
     """
 
-    L_idx = make_kT_mat(particle_rapidities, particle_phis, particle_pts)
+    ca_distances = np.sqrt(FormJets.ca_distances2(particle_rapidities, particle_phis))
+    gen_kt_factor = FormJets.genkt_factor(-1, np.array(particle_pts, dtype=float))
+    L_idx = ca_distances * gen_kt_factor
 
     return L_idx
 
 
-#TODO import
-def exp_affinity(distances2, sigma=1, exponent=2, fill_diagonal=True):
-    """Calculating the affinity from a_ij = exp(-d_ij^exponent/sigma)
-
-    Parameters
-    -------
-    distances2 : 2d array of float
-        Distances squared between points.
-    sigma : float (optional)
-        Controls the bandwidth of the kernal.
-        (Default; 1)
-    exponant : float (optional)
-        power to raise the distance to.
-        (Default; 2)
-    fill_diagonal : bool
-        If true, fill the diagonal with 0.
-        
-    Returns
-    -------
-    aff : 2d array of float
-        Affinities between the points provided.
-    """
-    aff = np.exp(-(distances2**(0.5*exponent))/sigma)
-    if fill_diagonal:
-        np.fill_diagonal(aff, 0.)
-    return aff
-
-
 def make_L(particle_rapidities, particle_phis, normalised=True, s = 0.15):
-
     """ Makes a weighted Laplacian from particle rapidities and phis,
     using the method found in SGWT paper for swiss roll example.
 
@@ -605,7 +516,6 @@ def make_L(particle_rapidities, particle_phis, normalised=True, s = 0.15):
 
 
 def wavelet_approx(L, l_max_val, L_idx,  N_scales = 1, m = 50):
-
     """ Approximates wavelets of N_scales around point given by L_idx
 
     Parameters
