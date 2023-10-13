@@ -214,11 +214,11 @@ def preprocess_coefficients(c):
     """Preprocess coefficients to ensure they're in the correct format."""
     # If c is a scalar or 1D list/array, convert to 2D array
 
-    if len(c) == 0:
-        raise ValueError("Coefficients are an empty list.")
-
     if np.isscalar(c):
         return np.array([[c]])
+
+    if len(c) == 0:
+        raise ValueError("Coefficients are an empty list.")
     
     # Check sizes of inner arrays of c and raise error if they differ
     if isinstance(c, list) and any(isinstance(x, np.ndarray) for x in c):
