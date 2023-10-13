@@ -12,7 +12,7 @@ from scipy.optimize import fminbound
 from . import FormJets
 
 
-
+# Deprecated, consider removing
 def max_eigenvalue(L):
     """Upper-bound on the spectrum."""
     try:
@@ -25,39 +25,6 @@ def max_eigenvalue(L):
                                    eigvals_only=True)
         # (such an elegantly consistent interface)
     return values[0]
-
-
-def rescale_laplacian(L, lmax):
-    """Rescale the Laplacian eigenvalues in [-1,1]."""
-    M, M = L.shape
-    I = scipy.sparse.identity(M, format='csr', dtype=L.dtype)
-    L /= lmax / 2
-    L -= I
-    return L
-
-
-def rough_l_max(L):
-    """Return a rough upper bound on the maximum eigenvalue of L.
-
-    Parameters
-    ----------
-    L: Symmetric matrix
-
-    Return
-    ------
-    l_max_ub: An upper bound of the maximum eigenvalue of L.
-    """
-    # TODO: Check if L is sparse or not, and handle the situation accordingly
-
-    l_max = np.linalg.eigvalsh(L.todense()).max()
-
-    # TODO: Fix this
-    # At least for demo_1, this is much slower
-    #l_max = ssl.arpack.eigsh(L, k=1, return_eigenvectors=False,
-    #                         tol=5e-3, ncv=10)
-
-    l_max_ub =  1.01 * l_max
-    return l_max_ub
 
     
 def set_scales(l_min, l_max, N_scales):
@@ -270,176 +237,44 @@ def preprocess_coefficients(c):
 
     return c.astype(np.float64)
 
-def cheby_op(f, L, c, arange):
+def cheby_op(wavelet_delta, laplacian, chebyshef_coefficients, arange):
     """Compute (possibly multiple) polynomials of laplacian (in Chebyshev basis) applied to input."""
     # Ensure everything is float type
-    f = f.astype(np.float64)
-    L = L.astype(np.float64)
+    wavelet_delta = wavelet_delta.astype(np.float64)
+    laplacian = laplacian.astype(np.float64)
 
-    c = preprocess_coefficients(c)
+    chebyshef_coefficients = preprocess_coefficients(chebyshef_coefficients)
     
-    N_scales, M = c.shape
+    N_scales, N_coefficients = chebyshef_coefficients.shape
 
-    a1 = (arange[1] - arange[0]) / 2.0
-    a2 = (arange[1] + arange[0]) / 2.0
+    half_width = (arange[1] - arange[0]) / 2.0
+    center = (arange[1] + arange[0]) / 2.0
 
-    Twf_old = f
-    Twf_cur = (L.dot(f) - a2 * f) / a1
+    fourier_transform_old = wavelet_delta
+    fourier_transform_cur = (laplacian.dot(wavelet_delta) - center * wavelet_delta) / half_width
 
     # Preallocate results
-    results = [np.zeros_like(f) for _ in range(N_scales)]
+    results = [np.zeros_like(wavelet_delta) for _ in range(N_scales)]
     for j in range(N_scales):
-        results[j] += 0.5 * c[j, 0] * Twf_old
-        if M > 1:
-            results[j] += c[j, 1] * Twf_cur
+        results[j] += 0.5 * chebyshef_coefficients[j, 0] * fourier_transform_old
+        if N_coefficients > 1:
+            results[j] += chebyshef_coefficients[j, 1] * fourier_transform_cur
 
-    for k in range(2, M):
-        Twf_new = (2 / a1) * (L.dot(Twf_cur) - a2 * Twf_cur) - Twf_old
+    for k in range(2, N_coefficients):
+        fourier_transform_new = (2/half_width)*(laplacian.dot(fourier_transform_cur)
+                                                - center*fourier_transform_cur) \
+                                - fourier_transform_old
         for j in range(N_scales):
-            results[j] += c[j, k] * Twf_new
+            results[j] += chebyshef_coefficients[j, k] * fourier_transform_new
 
-        Twf_old, Twf_cur = Twf_cur, Twf_new
+        fourier_transform_old, fourier_transform_cur = fourier_transform_cur, fourier_transform_new
 
-    if np.all(L == 0):
-        warnings.warn("The Laplacian matrix L is all zeros.")
-        return [np.zeros_like(f) for _ in range(c.shape[0])], np.zeros_like(f)
+    if np.all(laplacian == 0):
+        warnings.warn("The Laplacian matrix laplacian is all zeros.")
+        results = [np.zeros_like(wavelet_delta) for _ in
+                   range(chebyshef_coefficients.shape[0])]
     
-    return results, Twf_old
-
-
-def framebounds(g, lmin, lmax):
-    """
-
-    Parameters
-    ----------
-    g : function handles computing sgwt scaling function and wavelet
-       kernels
-    lmin, lmax : minimum nonzero, maximum eigenvalue
-
-    Returns
-    -------
-    A , B : frame bounds
-    sg2 : array containing sum of g(s_i*x)^2 (for visualization)
-    x : x values corresponding to sg2
-    """
-    N = 1000 # number of points for line search
-    x = np.linspace(lmin, lmax, N)
-    Nscales = len(g)
-
-    sg2 = np.zeros(x.size)
-    for ks in range(Nscales):
-        sg2 += (g[ks](x))**2
-
-    A = np.min(sg2)
-    B = np.max(sg2)
-
-    return (A, B, sg2, x)
-
-
-def view_design(g, t, arange):
-    """Plot the scaling and wavelet kernel.
-
-    Plot the input scaling function and wavelet kernels, indicates the wavelet
-    scales by legend, and also shows the sum of squares G and corresponding
-    frame bounds for the transform.
-
-    Parameters
-    ----------
-    g : list of  function handles for scaling function and wavelet kernels
-    t : array of wavelet scales corresponding to wavelet kernels in g
-    arange : approximation range
-
-    Returns
-    -------
-    h : figure handle
-    """
-    x = np.linspace(arange[0], arange[1])
-    h = plt.figure()
-    
-    J = len(g) 
-    G = np.zeros(x.size)
-
-    for n in range(J):
-        if n == 0:
-            lab = 'h'
-            plt.plot(x, g[n](x), label=lab)
-            G += g[n](x)
-
-    #plt.plot(x, G, 'k', label='G')
-
-    #(A, B, _, _) = framebounds(g, int(arange[0]), int(arange[1]))
-    #plt.axhline(A, c='m', ls=':', label='A')
-    #plt.axhline(B, c='g', ls=':', label='B')
-    #plt.xlim(arange[0], arange[1])
-
-    plt.title('Scaling function kernel h(x), Wavelet kernels g(t_j x) \n'
-              'sum of Squares G, and Frame Bounds')
-    #plt.yticks(np.r_[0:4])
-    #plt.ylim(0, 3)
-    plt.legend()
-
-    return h
-
-
-def swiss_roll(n, a=1, b=4, depth=5, do_rescale=True):
-    """Return n random points laying in a swiss roll.
-    The swiss roll manifold is the manifold typically used in manifold learning
-    and other dimensionality reduction techniques. It is determined by the
-    parametric equations
-    x1 = pi * sqrt((b^2 - y^2)*t + a^2) * cos(pi * sqrt((b^2 - y^2)*t1 + a^2))
-    x2 = depth * t2
-    x3 = pi * sqrt((b^2 - y^2)*t + a^2) * sin(pi * sqrt((b^2 - y^2)*t1 + a^2))
-    
-    Parameters
-    ----------
-    n : Number of points
-    a : Initial angle is a*pi
-    b : End angle is b*pi
-    depth: Depth of the roll
-    do_rescale: If True, rescale to the plus/minus 1 range, default to True
-    
-    Returns
-    -------
-    x : A 3-by-n ndarray [x1; x2; x3] with the points from the roll
-    """
-    y = np.random.rand(2, n)
-    t = np.pi * np.sqrt((b*b - a*a) * y[0,:] + a*a)
-    x2 = depth * y[1,:]
-    x1 = t * np.cos(t)
-    x3 = t * np.sin(t)
-
-    if do_rescale:
-        x1 = rescale(x1)
-        x2 = rescale(x2)
-        x3 = rescale(x3)
-    
-    x = np.vstack([x1, x2, x3])
-
-    return x
-
-
-def rescale(x):
-    """Rescale vector x into the [-1, 1] range.
-    Parameters
-    ----------
-    x: 1 dimensional ndarray
-    Returns:
-    -------
-    x: The original vector rescale to the range [-1, 1]
-    """
-    x -= x.mean()
-    x /= np.max(np.abs(x))
-    return x
-
-
-def clean_axes(ax):
-    for a in ax.w_xaxis.get_ticklines()+ax.w_xaxis.get_ticklabels():
-        a.set_visible(False)
-    for a in ax.w_yaxis.get_ticklines()+ax.w_yaxis.get_ticklabels():
-        a.set_visible(False)
-    for a in ax.w_zaxis.get_ticklines()+ax.w_zaxis.get_ticklabels():
-        a.set_visible(False) 
-    return
+    return results
 
 
 
@@ -493,23 +328,23 @@ def make_L(particle_rapidities, particle_phis, normalised=True, s = 0.15):
         Largest eigenvalue
     """
 
-    d = ca_distances2(particle_rapidities, particle_phis)
-    A = exp_affinity(d, s)
+    d = FormJets.ca_distances2(particle_rapidities, particle_phis)
+    A = FormJets.exp_affinity(d, s)
     #A = np.exp(-d**2 / (2 * s**2))
     #np.fill_diagonal(A, 0.)
     D = np.diag(np.sum(A, axis=0))
     L = D - A
 
-    if normalised == True:
+    if normalised:
         #L = (np.linalg.inv(D)**0.5) @ L @ (np.linalg.inv(D)**0.5)
         diags = np.sum(A, axis=0)
         diags_sqrt = 1.0 / np.sqrt(diags)
         diags_sqrt[np.isinf(diags_sqrt)] = 0
         D = np.diag(diags_sqrt)
         L = D @ (L @ D)
-
-    l_max_val = max_eigenvalue(L)
-    L = rescale_laplacian(L, l_max_val)
+        l_max_val = 2.
+    else:
+        l_max_val = max_eigenvalue(L)
 
     return L, l_max_val
 
@@ -539,7 +374,7 @@ def wavelet_approx(L, l_max_val, L_idx,  N_scales = 1, m = 50):
     """
 
     # Design filters for transform
-    (g, gp, t) = filter_design(l_max_val, N_scales)
+    (g, gp, _) = filter_design(l_max_val, N_scales)
     arange = (0.0, l_max_val)
 
     # Chebyshev polynomial approximation
@@ -551,69 +386,9 @@ def wavelet_approx(L, l_max_val, L_idx,  N_scales = 1, m = 50):
     d = L_idx.reshape(-1,1)
 
     # forward transform, using chebyshev approximation
-    wp_all, Twf_cur = cheby_op(d, L, c, arange)
+    wp_all = cheby_op(d, L, c, arange)
 
     return d, wp_all
-
-
-def plot_wavelet(particle_rapidities, particle_phis, wp_all, n=0, save_fig=False, plt_title='Wavelet', fig_name = 'wavelet_results.png'):
-
-    """ Plot of wavelet convoluted with the graph
-    Laplacian at a particular scale (n)
-
-    Parameters
-    ----------
-    rapidity : array of float
-        Row of rapidity values.
-    phi : array of float
-        Row of phi values.
-    wp_all : N_scapes x n x n array of float 
-        coefficients of shifted chebyshev polynomials
-    n: int (optional)
-        wavlet scale, 0 is scaling function
-
-    Returns
-    -------
-    plot of particles coloured by their shifted chebyshev coeff 
-    """
-
-    plt.scatter(particle_rapidities, particle_phis, c=[wp_all[n]], cmap='viridis')
-    plt.rcParams["figure.figsize"] = (8,8)
-    plt.title(plt_title)
-
-    if save_fig == True:
-        plt.savefig(fig_name)
-    plt.show()
-
-
-def cluster_L_plot(particle_rapidities, particle_phis, lbls, legend=True, savfig=False):
-
-    data = np.array((particle_rapidities, particle_phis, lbls))
-    x= data[0,:]
-    y= data[1,:]
-
-    uniq = list(set(data[-1,:]))
-
-    z = range(1,len(uniq))
-    cmap = plt.get_cmap('jet')
-    cNorm  = colors.Normalize(vmin=0, vmax=len(uniq))
-    scalarMap = matplotlib.cm.ScalarMappable(norm=cNorm, cmap=cmap)
-
-    for i in range(len(uniq)):
-        indx = data[-1,:] == uniq[i]
-        plt.scatter(x[indx], y[indx], s=15, color=scalarMap.to_rgba(i), label=uniq[i], alpha=0.9)
-
-    plt.rcParams["figure.figsize"] = (9.5,9.5)
-    plt.xlabel('Rapidity')
-    plt.ylabel('phi')
-    plt.title('Clusters')
-    if legend == True:
-        plt.legend(loc='upper right')
-
-    if savfig==True:
-        plt.savefig('wavelet_clusters.png')
-
-    plt.show()
 
 
 def min_max_scale(x):
@@ -621,31 +396,8 @@ def min_max_scale(x):
     return x1
 
 
-def wavelet_pos(L_idx, i):
-    """ Return the i'th highest index particle, as determined by
-    summing across the rows of L_idx
 
-    Parameters
-    ----------
-    L_idx : array of float
-        distance array of L_idx.
-    i : int
-        index to return.
-
-
-    Returns
-    -------
-    1d binary array of index to place the wavelet  
-    """
-
-    idx = L_idx.sum(axis=0).argsort()[i]
-    wav_pos = np.zeros_like(L_idx.sum(axis=0), dtype=int)
-    wav_pos[idx] = 1
-
-    return wav_pos
-
-
-def cluster_particles(particle_rapidities, particle_phis, particle_pts, s=0.11, cutoff=0, rounds=5, m=50, normalised=True):
+def cluster_particles(particle_rapidities, particle_phis, particle_pts, s=0.11, cutoff=0, rounds=15, m=50, normalised=True):
     """Cluster particles based on their wavelet properties"""
 
     # Number of particles
