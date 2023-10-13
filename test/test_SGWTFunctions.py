@@ -15,8 +15,8 @@ def test_set_scales():
     tst.assert_allclose(found, [2., 0.5])
     found = SGWTFunctions.set_scales(1., 2., 3)
     assert len(found) == 3
-    tst.assert_allclose(found[[0,-1]], [2., 0.5])
-    assert found[1] > 0.5 and found[1] < 2.
+    tst.assert_allclose(found[[0,-1]], [2., 1.])
+    assert found[1] > 1. and found[1] < 2.
 
     
 
@@ -86,6 +86,7 @@ def test_cluster_particles():
 
 
 class TestChebyOp(unittest.TestCase):
+    function_to_test = SGWTFunctions.cheby_op
     def setUp(self):
         self.f = np.array([1, 2, 3, 4])
         self.L = np.array([[4, -1, -1, -1], [-1, 3, -1, -1], [-1, -1, 3, -1], [-1, -1, -1, 3]])
@@ -94,23 +95,23 @@ class TestChebyOp(unittest.TestCase):
         self.arange = (0, 1)
 
     def test_multiple_coefficients(self):
-        results = SGWTFunctions.cheby_op(self.f, self.L, self.c_multiple, self.arange)  # unpack the tuple
+        results = function_to_test(self.f, self.L, self.c_multiple, self.arange)  # unpack the tuple
         self.assertIsInstance(results, list)
         for r in results:
             self.assertIsInstance(r, np.ndarray)
 
     def test_output_size(self):
-        result_single = SGWTFunctions.cheby_op(self.f, self.L, self.c_single, self.arange)
+        result_single = function_to_test(self.f, self.L, self.c_single, self.arange)
         result_single = np.array(result_single).reshape(-1,1).flatten()
         self.assertEqual(result_single.shape, self.f.shape)
 
-        results_multiple = SGWTFunctions.cheby_op(self.f, self.L, self.c_multiple, self.arange)
+        results_multiple = function_to_test(self.f, self.L, self.c_multiple, self.arange)
         for r in results_multiple:
             self.assertEqual(r.shape, self.f.shape)
     
     def test_not_iterable(self):
         c = 3
-        result = SGWTFunctions.cheby_op(self.f, self.L, c, self.arange)
+        result = function_to_test(self.f, self.L, c, self.arange)
         expected_output = [1.5 * self.f]
         print(result)
         print(expected_output)
@@ -119,14 +120,14 @@ class TestChebyOp(unittest.TestCase):
     def test_empty_iterable(self):
         c = []
         with self.assertRaises(ValueError) as context:
-            SGWTFunctions.cheby_op(self.f, self.L, c, self.arange)
+            function_to_test(self.f, self.L, c, self.arange)
         print("Actual exception message:", str(context.exception))
         self.assertTrue("Coefficients are an empty list." in str(context.exception))
 
     def test_generic_case(self):
         c = [np.array([1, 2, 3]), np.array([4, 5])]
         with self.assertRaises(ValueError) as context:
-            SGWTFunctions.cheby_op(self.f, self.L, c, self.arange)
+            function_to_test(self.f, self.L, c, self.arange)
         print("Actual exception message:", str(context.exception))  # Debug line
        
         self.assertTrue("All inner arrays of c must be of the same size." in str(context.exception))
@@ -136,8 +137,8 @@ class TestChebyOp(unittest.TestCase):
         zero_f = np.zeros_like(self.f)
         zero_L = np.zeros_like(self.L)
         c = np.array([1, 2, 3])
-        result_zero_f = SGWTFunctions.cheby_op(zero_f, self.L, c, self.arange)
-        result_zero_L = SGWTFunctions.cheby_op(self.f, zero_L, c, self.arange)
+        result_zero_f = function_to_test(zero_f, self.L, c, self.arange)
+        result_zero_L = function_to_test(self.f, zero_L, c, self.arange)
         print("Result with zero_f:", result_zero_f)
         print("Result with zero_L:", result_zero_L)
         self.assertTrue(np.array_equal(result_zero_f[0], np.zeros_like(self.f)))
@@ -156,7 +157,7 @@ class TestChebyOp(unittest.TestCase):
         c_test = np.array([1, 0])
         arange_test = (-1, 1)
         
-        result = SGWTFunctions.cheby_op(f_test, L_test, c_test, arange_test)
+        result = function_to_test(f_test, L_test, c_test, arange_test)
         expected_output = np.array([0.5])
 
 
@@ -198,7 +199,7 @@ class TestChebyOp(unittest.TestCase):
         c_test = np.array([1, 2])
         arange_test = (-1, 1)
         
-        result = SGWTFunctions.cheby_op(f_test, L_test, c_test, arange_test)
+        result = function_to_test(f_test, L_test, c_test, arange_test)
         expected_output = f_test * 2.5  # As T_1(x) is x and T_0(x) is 1, and c has values [1, 2]
 
         print("Expected output:", expected_output)
@@ -212,9 +213,9 @@ class TestChebyOp(unittest.TestCase):
         # The Chebyshev polynomial of the sum should be the sum of the Chebyshev polynomials.
         f1 = np.array([1, 2, 3, 4])
         f2 = np.array([4, 3, 2, 1])
-        result_sum = SGWTFunctions.cheby_op(f1 + f2, self.L, self.c_single, self.arange)
-        result_individual1 = SGWTFunctions.cheby_op(f1, self.L, self.c_single, self.arange)
-        result_individual2 = SGWTFunctions.cheby_op(f2, self.L, self.c_single, self.arange)
+        result_sum = function_to_test(f1 + f2, self.L, self.c_single, self.arange)
+        result_individual1 = function_to_test(f1, self.L, self.c_single, self.arange)
+        result_individual2 = function_to_test(f2, self.L, self.c_single, self.arange)
         
         # Convert to numpy arrays and sum them
         combined_results = np.array(result_individual1) + np.array(result_individual2)
@@ -232,13 +233,14 @@ class TestChebyOp(unittest.TestCase):
         c_test = np.array([1, 0, 2])
         arange_test = (0, 1)
         
-        result = SGWTFunctions.cheby_op(f_test, L_test, c_test, arange_test)
+        result = function_to_test(f_test, L_test, c_test, arange_test)
         # Compute the expected_output based on trusted method
         #expected_output = ...  
         #self.assertTrue(np.allclose(result, expected_output))
 
 
 class TestMakeLIdx(unittest.TestCase):
+    function_to_test = SGWTFunctions.make_L_idx
     def test_basic_functionality(self):
         y = [0.5, 1, 1.5]
         # Becuase of the phi values, no angular considerations are needed.
@@ -265,7 +267,7 @@ class TestMakeLIdx(unittest.TestCase):
                                     [0.824227, 0., 0.549484],
                                     [1.098969, 0.549484, 0.]])
 
-        np.testing.assert_almost_equal(SGWTFunctions.make_L_idx(y, phi, pT), expected_output,
+        np.testing.assert_almost_equal(function_to_test(y, phi, pT), expected_output,
                                        decimal=5)
 
 
@@ -273,10 +275,10 @@ class TestMakeLIdx(unittest.TestCase):
         # Looking at the rest of your code, I'm
         # not sure a ValueError is desirable here
         #with self.assertRaises(ValueError):
-        #    SGWTFunctions.make_L_idx([], [], [])
+        #    function_to_test([], [], [])
 
         # Sugested test
-        found = SGWTFunctions.make_L_idx([], [], [])
+        found = function_to_test([], [], [])
         assert len(found) == 0
 
     def test_length_one(self):
@@ -284,20 +286,20 @@ class TestMakeLIdx(unittest.TestCase):
         phi = [np.pi/4]
         pT = [1]
         expected_output = np.array([[0.]])
-        np.testing.assert_almost_equal(SGWTFunctions.make_L_idx(y, phi, pT), expected_output)
+        np.testing.assert_almost_equal(function_to_test(y, phi, pT), expected_output)
 
     def test_same_pT_values(self):
         y = [0.5, 1, 1.5]
         phi = [0, np.pi/2, np.pi]
         pT = [2, 2, 2]
-        mat = SGWTFunctions.make_L_idx(y, phi, pT)
+        mat = function_to_test(y, phi, pT)
         self.assertTrue((np.diag(mat) == 0).all())  # Check diagonal elements are zero
 
     def test_large_y_difference(self):
         y = [0.5, 10]
         phi = [0, np.pi/2]
         pT = [1, 2]
-        mat = SGWTFunctions.make_L_idx(y, phi, pT)
+        mat = function_to_test(y, phi, pT)
         self.assertTrue((np.diag(mat) == 0).all())
 
     def test_phi_exceeding_2pi(self):
@@ -305,26 +307,27 @@ class TestMakeLIdx(unittest.TestCase):
         phi = [0, 3*np.pi]
         pT = [1, 2]
         expected_phi = [0, np.pi]
-        mat1 = SGWTFunctions.make_L_idx(y, phi, pT)
-        mat2 = SGWTFunctions.make_L_idx(y, expected_phi, pT)
+        mat1 = function_to_test(y, phi, pT)
+        mat2 = function_to_test(y, expected_phi, pT)
         np.testing.assert_almost_equal(mat1, mat2)
 
     def test_symmetry(self):
         y = [0.5, 1, 2]
         phi = [0, np.pi/4, np.pi/2]
         pT = [1, 2, 3]
-        mat = SGWTFunctions.make_L_idx(y, phi, pT)
+        mat = function_to_test(y, phi, pT)
         np.testing.assert_almost_equal(mat, mat.T)
 
 
 class TestChebyCoeff(unittest.TestCase):
+    function_to_test = SGWTFunctions.cheby_coeff
     def test_even_function(self):
         # Function: f(x) = x^4 on [-1, 1]
         # The Chebyshev coefficients for even functions will have c[1], c[3], ... as 0
         def f(x):
             return x**4
 
-        coefficients = SGWTFunctions.cheby_coeff(f, 5)
+        coefficients = function_to_test(f, 5)
         self.assertAlmostEqual(coefficients[1], 0, places=10)
         self.assertAlmostEqual(coefficients[3], 0, places=10)
         self.assertAlmostEqual(coefficients[5], 0, places=10)
@@ -335,7 +338,7 @@ class TestChebyCoeff(unittest.TestCase):
         def f(x):
             return x**2
 
-        coefficients = SGWTFunctions.cheby_coeff(f, 5)
+        coefficients = function_to_test(f, 5)
         x = np.linspace(-1, 1, 400)
         np_coeffs = np.polynomial.chebyshev.chebfit(x, f(x), 5)
         # Note: numpy's chebfit might return coefficients in a different order,

@@ -51,13 +51,8 @@ def set_scales(l_min, l_max, N_scales):
     -------
     s: wavelet scales
     """
-    x1=1
-    x2=2
-    s_min = x1 / l_max
-    s_max = x2 / l_min
     # Scales should be decreasing ... higher j should give larger s
-    s = np.exp(np.linspace(np.log(s_max), np.log(s_min), N_scales));
-
+    s = np.logspace(l_max, l_min, N_scales);
     return s
 
 def kernel(x, g_type='abspline', a=2, b=2, t1=1, t2=2):
@@ -236,6 +231,7 @@ def preprocess_coefficients(c):
         return np.vstack(c)
 
     return c.astype(np.float64)
+
 
 def cheby_op(wavelet_delta, laplacian, chebyshef_coefficients, arange):
     """Compute (possibly multiple) polynomials of laplacian (in Chebyshev basis) applied to input."""

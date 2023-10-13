@@ -1,0 +1,3 @@
+[submodule "spectraljet/cpp_sgwj"]
+	path = spectraljet/cpp_sgwj
+	url = git@github.com:HenryDayHall/cpp_sgwj.git
