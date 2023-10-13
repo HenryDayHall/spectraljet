@@ -214,7 +214,7 @@ def preprocess_coefficients(c):
     """Preprocess coefficients to ensure they're in the correct format."""
     # If c is a scalar or 1D list/array, convert to 2D array
 
-    if c ==[]:
+    if len(c) == 0:
         raise ValueError("Coefficients are an empty list.")
 
     if np.isscalar(c):
