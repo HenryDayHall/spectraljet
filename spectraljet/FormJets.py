@@ -1945,10 +1945,11 @@ class Partitional(Clustering):
         # we limit the maximum elements in memory
         ints = -np.ones((max_elements, len(self.int_columns)),
                         dtype=int)
-        ints[:n_inputs] = start_ints
         floats = np.full((max_elements, len(self.float_columns)),
                          np.nan, dtype=float)
-        floats[:n_inputs] = start_floats
+        if len(start_ints):
+            ints[:n_inputs] = start_ints
+            floats[:n_inputs] = start_floats
         return ints, floats
 
     def run(self):
