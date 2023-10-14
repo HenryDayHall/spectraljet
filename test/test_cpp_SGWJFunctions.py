@@ -1,10 +1,10 @@
 import numpy as np
 from numpy import testing as tst
-from spectraljet import Constants
+from spectraljet import Constants, FormJets
 from spectraljet.cpp_sgwj import build
 
 build_dir = Constants.sgwj_build_dir
-build.build(build_dir, force_rebuild = True)
+build.build(build_dir, force_rebuild = False)
 sgwj = build.get_module(build_dir)
 
 from . import test_SGWTFunctions, test_Components, test_FormJets
@@ -114,11 +114,51 @@ def test_CambridgeAachenDistance2():
     tst.assert_allclose(found, 1.)
 
 
-def test_GeneralisedKTDistance():
-    # For the scalar version it's easier to write new tests.
+def test_GeneralisedKtDistance():
+    # Its too complicated to import the existing test due to matrix structures;
+    # But we can compare outputs with the python version
+    input_rapidities = [0, 1., 2., 3., -1., -2., -3.]
+    input_rapidities += input_rapidities
+    input_phis = [0, 1., np.pi, np.pi - 1., -1.,  2*np.pi, 0.]
+    input_phis += input_phis[::-1]
+    input_pts = [0, 1., 2., 0., 1., 10., 100.]
+    input_pts += input_pts
+    n_particles = len(input_rapidities)
+    ca2_from_python = FormJets.ca_distances2(input_rapidities, input_phis)
+    for kt_factor in [-1, 0, 0.5, 1]:
+        kt_from_python = FormJets.genkt_factor(kt_factor, np.array(input_pts))
+        python_result = np.sqrt(ca2_from_python) * kt_from_python
+        # First test the pairwise version
+        for row in range(n_particles):
+            for col in range(row):
+                cpp_distance = sgwj.GeneralisedKtDistance(input_pts[row],
+                                                          input_rapidities[row],
+                                                          input_phis[row],
+                                                          input_pts[col],
+                                                          input_rapidities[col],
+                                                          input_phis[col],
+                                                          kt_factor)
+                error_message = (f"kt_factor = {kt_factor}, pt_row = {input_pts[row]}, "
+                                 + f"pt_col = {input_pts[col]}, "
+                                 + f"rapidity_row = {input_rapidities[row]}, "
+                                 + f"rapidity_col = {input_rapidities[col]}, "
+                                 + f"phi_row = {input_phis[row]}, phi_col = {input_phis[col]}"
+                                 + f"python_result = {python_result[row, col]}, "
+                                 + f"cpp_result = {cpp_distance}")
+                tst.assert_allclose(cpp_distance, python_result[row, col],
+                                    err_msg = error_message)
+        # Now test the matrix version
+        cpp_result = sgwj.GeneralisedKtDistanceMatrix(input_pts,
+                                                      input_rapidities,
+                                                      input_phis,
+                                                      kt_factor)
+        # generally don't care if there are nans on the diagonal that don't match
+        for i in range(n_particles):
+            if np.isnan(python_result[i,i]):
+                cpp_result[i][i] = np.nan
+        tst.assert_allclose(python_result, cpp_result)
 
-    pass
-    #TODO import test and apply
+
 
 def test_NamedDistance():
     pass
