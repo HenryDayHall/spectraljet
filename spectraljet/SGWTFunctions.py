@@ -52,8 +52,9 @@ def set_scales(l_min, l_max, N_scales):
     s: wavelet scales
     """
     # Scales should be decreasing ... higher j should give larger s
-    s = np.logspace(l_max, l_min, N_scales);
-    return s
+    unscaled = np.logspace(2., 1., N_scales);
+    scales = ((l_max - l_min)/90.) * (unscaled - 10.) + l_min
+    return scales
 
 def kernel(x, g_type='abspline', a=2, b=2, t1=1, t2=2):
     """Compute sgwt kernel.
