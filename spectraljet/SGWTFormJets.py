@@ -1,5 +1,6 @@
 import numpy as np
 from . import FormJets, Constants, SGWTFunctions
+from spectraljet.cpp_sgwj import build
 
 
 class SGWT(FormJets.Partitional):
@@ -72,5 +73,37 @@ class SGWT(FormJets.Partitional):
 
         return jet_list
 
+
+class SGWTCpp(FormJets.Partitional):
+    default_params = {'Sigma': .1,
+                      'Cutoff': 0,
+                      'NRounds': 15}
+    permited_values = {'Sigma': Constants.numeric_classes['pdn'],
+                       'Cutoff': Constants.numeric_classes['rn'],
+                       'NRounds': Constants.numeric_classes['nn']}
+
+    def _setup_clustering_functions(self):
+        """
+        Assigns internal functions needed in the clustering.
+        Assumes the hyperparams have been set.
+        """
+        build_dir = Constants.sgwj_build_dir
+        build.build(build_dir, force_rebuild = False)
+        cpp_module = build.get_module(build_dir)
+        self.cpp = cpp_module.Cluster(self.Sigma, self.Cutoff, self.NRounds)
+
+    def setup_internal(self):
+        """ Runs before allocate """
+        self.cpp.SetInputs(self.Leaf_Label, self.Leaf_Energy,
+                           self.Leaf_PT, self.Leaf_Rapidity, self.Leaf_Phi)
+
+    def allocate(self):
+        """Sort the labels into exclusive jets"""
+        self.cpp.DoAllMerges()
+        jet_list = self.cpp.GetJetConstituents()
+        return jet_list
+
 FormJets.cluster_classes["SGWT"] = SGWT
 FormJets.multiapply_input["SGWT"] = SGWT
+FormJets.cluster_classes["SGWTCpp"] = SGWTCpp
+FormJets.multiapply_input["SGWTCpp"] = SGWTCpp
