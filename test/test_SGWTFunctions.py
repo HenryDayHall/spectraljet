@@ -87,15 +87,13 @@ def test_cluster_particles():
 
 class TestChebyOp(unittest.TestCase):
     def function(self, *args, **kwargs):
-        print(f"cheby_op, args={args}, kwargs={kwargs}")
         return SGWTFunctions.cheby_op(*args, **kwargs)
 
-    def setUp(self):
-        self.f = np.array([1, 2, 3, 4])
-        self.L = np.array([[4, -1, -1, -1], [-1, 3, -1, -1], [-1, -1, 3, -1], [-1, -1, -1, 3]])
-        self.c_single = np.array([1, 0, 2])
-        self.c_multiple = [np.array([1, 0, 2]), np.array([1, 2, 3])]
-        self.arange = (0, 1)
+    f = np.array([1, 2, 3, 4])
+    L = np.array([[4, -1, -1, -1], [-1, 3, -1, -1], [-1, -1, 3, -1], [-1, -1, -1, 3]])
+    c_single = np.array([1, 0, 2])
+    c_multiple = [np.array([1, 0, 2]), np.array([1, 2, 3])]
+    arange = (0, 1)
 
     def test_multiple_coefficients(self):
         results = self.function(self.f, self.L, self.c_multiple, self.arange)  # unpack the tuple
@@ -116,22 +114,20 @@ class TestChebyOp(unittest.TestCase):
         c = 3
         result = self.function(self.f, self.L, c, self.arange)
         expected_output = [1.5 * self.f]
-        print(result)
-        print(expected_output)
-        self.assertTrue(np.array_equal(result, expected_output))
+        tst.assert_allclose(result, expected_output)
 
     def test_empty_iterable(self):
         c = []
         with self.assertRaises(ValueError) as context:
             self.function(self.f, self.L, c, self.arange)
-        print("Actual exception message:", str(context.exception))
+        #print("Actual exception message:", str(context.exception))
         self.assertTrue("Coefficients are an empty list." in str(context.exception))
 
     def test_generic_case(self):
         c = [np.array([1, 2, 3]), np.array([4, 5])]
         with self.assertRaises(ValueError) as context:
             self.function(self.f, self.L, c, self.arange)
-        print("Actual exception message:", str(context.exception))  # Debug line
+        #print("Actual exception message:", str(context.exception))  # Debug line
        
         self.assertTrue("All inner arrays of c must be of the same size." in str(context.exception))
 
@@ -142,10 +138,8 @@ class TestChebyOp(unittest.TestCase):
         c = np.array([1, 2, 3])
         result_zero_f = self.function(zero_f, self.L, c, self.arange)
         result_zero_L = self.function(self.f, zero_L, c, self.arange)
-        print("Result with zero_f:", result_zero_f)
-        print("Result with zero_L:", result_zero_L)
-        self.assertTrue(np.array_equal(result_zero_f[0], np.zeros_like(self.f)))
-        self.assertTrue(np.array_equal(result_zero_L[0], np.zeros_like(self.f)))
+        tst.assert_allclose(result_zero_f[0], np.zeros_like(self.f))
+        tst.assert_allclose(result_zero_L[0], np.zeros_like(self.f))
 
 
     def test_basic_polynomial_evaluation(self):
@@ -161,13 +155,9 @@ class TestChebyOp(unittest.TestCase):
         arange_test = (-1, 1)
         
         result = self.function(f_test, L_test, c_test, arange_test)
-        expected_output = np.array([0.5])
+        expected_output = np.array([[0.5]])
 
-
-        print(result)
-        print(expected_output)
-
-        self.assertTrue(np.allclose(result, expected_output))
+        tst.assert_allclose(result, expected_output)
     
     def test_identity_L(self):
         """
@@ -205,11 +195,7 @@ class TestChebyOp(unittest.TestCase):
         result = self.function(f_test, L_test, c_test, arange_test)
         expected_output = f_test * 2.5  # As T_1(x) is x and T_0(x) is 1, and c has values [1, 2]
 
-        print("Expected output:", expected_output)
-        print("Actual result:", result[0])  # Assuming results is a list of arrays. Adjust if needed.
-
-
-        self.assertTrue(np.allclose(result[0], expected_output))
+        tst.assert_allclose(result[0], expected_output)
 
 
     def test_linearity(self):
@@ -223,23 +209,8 @@ class TestChebyOp(unittest.TestCase):
         # Convert to numpy arrays and sum them
         combined_results = np.array(result_individual1) + np.array(result_individual2)
         
-        # Print values to see what's going on
-        print("Result for (f1 + f2):", result_sum[0])
-        print("Sum of results for f1 and f2:", combined_results)
-        
-        self.assertTrue(np.allclose(result_sum[0], combined_results))
+        tst.assert_allclose(result_sum, combined_results)
 
-
-    def test_known_values(self):
-        f_test = np.array([1, 2, 3, 4])
-        L_test = (np.array([[4, -1, 0, 0], [-1, 4, -1, 0], [0, -1, 4, -1], [0, 0, -1, 4]]))
-        c_test = np.array([1, 0, 2])
-        arange_test = (0, 1)
-        
-        result = self.function(f_test, L_test, c_test, arange_test)
-        # Compute the expected_output based on trusted method
-        #expected_output = ...  
-        #self.assertTrue(np.allclose(result, expected_output))
 
 
 class TestMakeLIdx(unittest.TestCase):
@@ -350,9 +321,7 @@ class TestChebyCoeff(unittest.TestCase):
         np_coeffs = np.polynomial.chebyshev.chebfit(x, f(x), 5)
         # Note: numpy's chebfit might return coefficients in a different order,
         # so you might need to reverse the coefficients before comparing
-        print(coefficients)
-        print(np_coeffs)
-        self.assertTrue(np.allclose(coefficients, np_coeffs, atol=1e-10))
+        tst.assert_allclose(coefficients, np_coeffs, atol=1e-10)
 
 
 

@@ -35,16 +35,6 @@ class TestCPPMakeLIdx(test_SGWTFunctions.TestMakeLIdx):
         metric = sgwj.JetMetrics.antikt
         return sgwj.NamedDistanceMatrix(particle_pts, particle_rapidities, particle_phis, metric)
 
-#
-#
-#class TestCPPChebyOp(test_SGWTFunctions.TestChebyOp):
-#    def function(self, wavelet_delta, laplacian, chebyshef_coefficients, arange):
-#        laplacian = list(list(row) for row in laplacian)
-#        chebyshef_coefficients = list(chebyshef_coefficients)
-#        center_idx = np.where(wavelet_delta)[0][0]
-#        interval = list(arange)
-#        return sgwj.LaplacianWavelet(laplacian, chebyshef_coefficients, center_idx, interval)
-
 
 def test_VectorAddition():
     # Two empty vectors should make another empty vector
