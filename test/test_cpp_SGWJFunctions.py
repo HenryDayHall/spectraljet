@@ -15,14 +15,14 @@ from . import test_SGWTFunctions, test_Components, test_FormJets
 #        return sgwj.ChebyshevCoefficients(m, N, arange[0], arange[1])
 #
 #
-#class TestCPPMakeLIdx(test_SGWTFunctions.TestMakeLIdx):
-#    def function(self, particle_rapidities, particle_phis, particle_pts):
-#        particle_rapidities = list(particle_rapidities)
-#        particle_phis = list(particle_phis)
-#        particle_pts = list(particle_pts)
-#        metric = sgwj.JetMetrics.antikt
-#        return sgwj.NamedDistanceMetric(particle_pts, particle_rapidities, particle_phis, metric)
-#
+class TestCPPMakeLIdx(test_SGWTFunctions.TestMakeLIdx):
+    def function(self, particle_rapidities, particle_phis, particle_pts):
+        particle_rapidities = list(particle_rapidities)
+        particle_phis = list(particle_phis)
+        particle_pts = list(particle_pts)
+        metric = sgwj.JetMetrics.antikt
+        return sgwj.NamedDistanceMatrix(particle_pts, particle_rapidities, particle_phis, metric)
+
 #
 #
 #class TestCPPChebyOp(test_SGWTFunctions.TestChebyOp):
@@ -182,19 +182,155 @@ def test_GeneralisedKtDistance():
 
 
 
-def test_Affinities():
-    pass
-    #TODO import test and apply
+class TestCPPExpAffinity(test_FormJets.TestExpAffinity):
+    def function(self, distances2, sigma=1, exponant=2, fill_diagonal=True):
+        if exponant != 2:
+            raise NotImplementedError("Can't do that in c++")
+        if not fill_diagonal:
+            raise NotImplementedError("Can't avoid that in c++")
+        if hasattr(distances2, "tolist"):
+            distances2 = distances2.tolist()
+        return sgwj.Affinities(distances2, sigma)
+
+    def test_assymetric(self):
+        pass  # disable these tests as they are not implemented in c++
+
+    def test_exponent_fill_diagonal(self):
+        pass  # disable these tests as they are not implemented in c++
+
 
 def test_Laplacian():
-    pass
-    #TODO import test and apply
+    # shouldn't choke on an empty matrix
+    input_distances2 = []
+    sigma = 1
+    normalised = True
+    found = sgwj.Laplacian(input_distances2, sigma, normalised)
+    found = np.array(found)
+    assert len(found.flatten()) == 0
+    # can't really import the existing test as it starts from an
+    # affinity matrix, but we can compare outputs with the python version
+    distance2_matrices = ([[0., 1.], [1., 0.]],
+                          [[0., 1., 2.], [1., 0., 1.], [2., 1., 0.]],
+                          [[1., 2., 3.], [2., 1., 2.], [3., 2., 1.]])
+    sigmas = [1, 2, 3]
+    for input_distances2 in distance2_matrices:
+        for sigma in sigmas:
+            exp_affinity = FormJets.exp_affinity(np.array(input_distances2), sigma)
+            found = sgwj.Laplacian(input_distances2, sigma, True)
+            python_version = FormJets.symmetric_laplacian(exp_affinity)
+            tst.assert_allclose(found, python_version)
+            found = sgwj.Laplacian(input_distances2, sigma, False)
+            python_version = FormJets.unnormed_laplacian(exp_affinity)
+            tst.assert_allclose(found, python_version)
 
-def test_PxPyPz():
-    pass
-    #TODO import test and apply
 
-def test_PtRapPhi():
-    pass
-    #TODO import test and apply
+
+def test_PxPyPz_PtRapPhi():
+    atol = 1e-5
+    # With no transverse momentum, phi isn't well defined.
+    energy = 1
+    ptrapphi = (0, 0, 0)
+    pxpypz = (0, 0, 0)
+    found = sgwj.PxPyPz(energy, *ptrapphi)
+    tst.assert_allclose(found, pxpypz, atol=atol)
+    found = sgwj.PtRapPhi(energy, *pxpypz)
+    tst.assert_allclose(found[:2], ptrapphi[:2], atol=atol)
+    energy = 1
+    ptrapphi = (0, 0, 1)
+    pxpypz = (0, 0, 0)
+    found = sgwj.PxPyPz(energy, *ptrapphi)
+    tst.assert_allclose(found,pxpypz, atol=atol)
+    found = sgwj.PtRapPhi(energy, *pxpypz)
+    tst.assert_allclose(found[:2], ptrapphi[:2], atol=atol)
+    energy = 1
+    ptrapphi = (1, 0, 0)
+    pxpypz = (1, 0, 0)
+    found = sgwj.PxPyPz(energy, *ptrapphi)
+    tst.assert_allclose(found,pxpypz, atol=atol)
+    found = sgwj.PtRapPhi(energy, *pxpypz)
+    tst.assert_allclose(found[:2], ptrapphi[:2], atol=atol)
+    energy = 1
+    ptrapphi = (1, 0, np.pi/2.)
+    pxpypz = (0, 1, 0)
+    found = sgwj.PxPyPz(energy, *ptrapphi)
+    tst.assert_allclose(found,pxpypz, atol=atol)
+    found = sgwj.PtRapPhi(energy, *pxpypz)
+    tst.assert_allclose(found, ptrapphi, atol=atol)
+    energy = 2
+    ptrapphi = (1, 0, 0)
+    pxpypz = (1, 0, 0)
+    found = sgwj.PxPyPz(energy, *ptrapphi)
+    tst.assert_allclose(found,pxpypz, atol=atol)
+    found = sgwj.PtRapPhi(energy, *pxpypz)
+    tst.assert_allclose(found, ptrapphi, atol=atol)
+    energy = 3
+    ptrapphi = (2, 0, 0)
+    pxpypz = (2, 0, 0)
+    found = sgwj.PxPyPz(energy, *ptrapphi)
+    tst.assert_allclose(found,pxpypz, atol=atol)
+    found = sgwj.PtRapPhi(energy, *pxpypz)
+    tst.assert_allclose(found, ptrapphi, atol=atol)
+    energy = 1
+    ptrapphi = (1, 0, -np.pi/2)
+    pxpypz = (0, -1, 0)
+    found = sgwj.PxPyPz(energy, *ptrapphi)
+    tst.assert_allclose(found, pxpypz, atol=atol)
+    found = sgwj.PtRapPhi(energy, *pxpypz)
+    tst.assert_allclose(found, ptrapphi, atol=atol)
+    energy = 1
+    ptrapphi = (1, 0, np.pi)
+    pxpypz = (-1, 0, 0)
+    found = sgwj.PxPyPz(energy, *ptrapphi)
+    tst.assert_allclose(found,pxpypz, atol=atol)
+    found = sgwj.PtRapPhi(energy, *pxpypz)
+    tst.assert_allclose(found, ptrapphi, atol=atol)
+    energy = 1
+    ptrapphi = (1, 0, 2*np.pi)
+    pxpypz = (1, 0, 0)
+    found = sgwj.PxPyPz(energy, *ptrapphi)
+    tst.assert_allclose(found,pxpypz, atol=atol)
+    found = sgwj.PtRapPhi(energy, *pxpypz)
+    # 2pi is 0
+    tst.assert_allclose(found, [1, 0, 0], atol=atol)
+    energy = 1
+    ptrapphi = (1, 1, 0)
+    pz = 1*(np.exp(2*1) - 1)/(np.exp(2*1) + 1)
+    pxpypz = (1, 0, pz)
+    found = sgwj.PxPyPz(energy, *ptrapphi)
+    tst.assert_allclose(found, pxpypz, atol=atol)
+    found = sgwj.PtRapPhi(energy, *pxpypz)
+    tst.assert_allclose(found, ptrapphi, atol=atol)
+    energy = 5
+    ptrapphi = (1, 1, 0)
+    pz = 5*(np.exp(2*1) - 1)/(np.exp(2*1) + 1)
+    pxpypz = (1, 0, pz)
+    found = sgwj.PxPyPz(energy, *ptrapphi)
+    tst.assert_allclose(found,pxpypz, atol=atol)
+    found = sgwj.PtRapPhi(energy, *pxpypz)
+    tst.assert_allclose(found, ptrapphi, atol=atol)
+    energy = 1
+    ptrapphi = (1, 4, 0)
+    pz = 1*(np.exp(2*4) - 1)/(np.exp(2*4) + 1)
+    pxpypz = (1, 0, pz)
+    found = sgwj.PxPyPz(energy, *ptrapphi)
+    tst.assert_allclose(found,pxpypz, atol=atol)
+    found = sgwj.PtRapPhi(energy, *pxpypz)
+    tst.assert_allclose(found, ptrapphi, atol=atol)
+    energy = 1
+    ptrapphi = (1, -4, np.pi/4)
+    pz = -1*(np.exp(2*4) - 1)/(np.exp(2*4) + 1)
+    pxpypz = (1/np.sqrt(2), 1/np.sqrt(2), pz)
+    found = sgwj.PxPyPz(energy, *ptrapphi)
+    tst.assert_allclose(found,pxpypz, atol=atol)
+    found = sgwj.PtRapPhi(energy, *pxpypz)
+    tst.assert_allclose(found, ptrapphi, atol=atol)
+    energy = 1
+    ptrapphi = (1, -4, 3*np.pi/4)
+    pz = -1*(np.exp(2*4) - 1)/(np.exp(2*4) + 1)
+    pxpypz = (-1/np.sqrt(2), 1/np.sqrt(2), pz)
+    found = sgwj.PxPyPz(energy, *ptrapphi)
+    tst.assert_allclose(found,pxpypz, atol=atol)
+    found = sgwj.PtRapPhi(energy, *pxpypz)
+    tst.assert_allclose(found, ptrapphi, atol=atol)
+
 

@@ -320,7 +320,7 @@ class TestMakeLIdx(unittest.TestCase):
         y = [0.5, 1, 2]
         phi = [0, np.pi/4, np.pi/2]
         pT = [1, 2, 3]
-        mat = self.function(y, phi, pT)
+        mat = np.array(self.function(y, phi, pT))
         np.testing.assert_almost_equal(mat, mat.T)
 
 
