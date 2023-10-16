@@ -10,11 +10,23 @@ sgwj = build.get_module(build_dir)
 from . import test_SGWTFunctions, test_Components, test_FormJets
 
 
-#class TestCPPChebyCoeff(test_SGWTFunctions.TestChebyCoeff):
-#    def function(self, g, m, N=None, arange=(-1,1)):
-#        return sgwj.ChebyshevCoefficients(m, N, arange[0], arange[1])
-#
-#
+def test_ChebyshevCoefficients_vs_np_cheb():
+    # There is no point importing the chebyshev tests,
+    # as they are for application to a generic function,
+    # but we specifically want the coefficients of f(x) = exp(-x)
+    # Using numpy's chebfit function to compute the coefficients
+    # For the function f(x) = x^3
+    def f(x):
+        return np.exp(-x)
+
+    grid_order = 400
+    interval_min = -1
+    interval_max = 1
+    x = np.linspace(interval_min, interval_max, grid_order)
+    np_coeffs = np.polynomial.chebyshev.chebfit(x, f(x), 5)
+    coefficients = sgwj.ChebyshevCoefficients(5, grid_order, interval_min, interval_max)
+    tst.assert_allclose(coefficients, np_coeffs, atol=1e-4)
+
 class TestCPPMakeLIdx(test_SGWTFunctions.TestMakeLIdx):
     def function(self, particle_rapidities, particle_phis, particle_pts):
         particle_rapidities = list(particle_rapidities)
