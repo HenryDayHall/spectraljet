@@ -1,13 +1,44 @@
 import numpy as np
 from numpy import testing as tst
-from spectraljet import Constants, FormJets
+from spectraljet import Constants, FormJets, SGWTFunctions
 from spectraljet.cpp_sgwj import build
 
 build_dir = Constants.sgwj_build_dir
-build.build(build_dir, force_rebuild = False)
+build.build(build_dir, force_rebuild = True)
 sgwj = build.get_module(build_dir)
 
 from . import test_SGWTFunctions, test_Components, test_FormJets
+
+
+def test_LaplacianWavelet():
+    # shouldn't choke on an empty laplacian
+    found = sgwj.LaplacianWavelet([], [1.], 0, [-1, 1])
+    assert len(found) == 0
+    # This can be compared to cheby_op, as they fill the same role
+    intervals = [[-1, 1], [0, 2]]
+    laplacians = ([[1, -0.1], [-0.1, 1]],
+                  [[10, -0.1], [-0.1, 10]],
+                  [[1, 0., -0.5], [0., 1, 0.], [-0.5, 0., 1]],
+                  [[1, -0.1, -0.5, 0.],
+                   [-0.1, 1., 0., -0.5],
+                   [-0.5, 0., 1., -0.1],
+                   [0., -0.5, -0.1, 1.]])
+    coefficients = sgwj.ChebyshevCoefficients(4);
+    for interval in intervals:
+        for laplacian in laplacians:
+            num_points = len(laplacian)
+            for seed in range(num_points):
+                found = sgwj.LaplacianWavelet(laplacian, coefficients[:num_points], seed, interval)
+                wavelet_mask = np.zeros(num_points, dtype=int)
+                wavelet_mask[seed] = 1
+                expected = SGWTFunctions.cheby_op(wavelet_mask, np.array(laplacian),
+                                                  coefficients[:num_points], interval)
+                error_message = f"interval = {interval}, seed = {seed}, " + \
+                                f"coefficients = {coefficients[:num_points]}, " + \
+                                f"laplacian = {laplacian}"
+                tst.assert_allclose(found, expected[0], err_msg=error_message, atol=1e-5)
+
+
 
 
 def test_ChebyshevCoefficients_vs_np_cheb():
@@ -26,6 +57,7 @@ def test_ChebyshevCoefficients_vs_np_cheb():
     np_coeffs = np.polynomial.chebyshev.chebfit(x, f(x), 5)
     coefficients = sgwj.ChebyshevCoefficients(5, grid_order, interval_min, interval_max)
     tst.assert_allclose(coefficients, np_coeffs, atol=1e-4)
+
 
 class TestCPPMakeLIdx(test_SGWTFunctions.TestMakeLIdx):
     def function(self, particle_rapidities, particle_phis, particle_pts):

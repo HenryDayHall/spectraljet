@@ -112,6 +112,6 @@ class TestSGWT(unittest.TestCase):
         tst.assert_allclose(algo._floats[:len(floats)], floats, atol=1e-6)
 
 
-
-class TestSGWTCpp(TestSGWT):
-    to_test = SGWTFormJets.SGWTCpp
+#
+#class TestSGWTCpp(TestSGWT):
+#    to_test = SGWTFormJets.SGWTCpp

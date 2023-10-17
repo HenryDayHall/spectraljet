@@ -206,6 +206,7 @@ def cheby_coeff(g, m, N=None, arange=(-1,1)):
 
     return c
 
+
 def preprocess_coefficients(c):
     """Preprocess coefficients to ensure they're in the correct format."""
     # If c is a scalar or 1D list/array, convert to 2D array
