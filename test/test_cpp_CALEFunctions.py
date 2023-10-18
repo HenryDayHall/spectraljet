@@ -1,13 +1,13 @@
 import numpy as np
 from numpy import testing as tst
-from spectraljet import Constants, FormJets, SGWTFunctions
-from spectraljet.spectraljet.cpp_CALE import build
+from spectraljet import Constants, FormJets, CALEFunctions
+from spectraljet.cpp_CALE import build
 
 build_dir = Constants.CALE_build_dir
 build.build(build_dir, force_rebuild = True)
 CALE = build.get_module(build_dir)
 
-from . import test_SGWTFunctions, test_Components, test_FormJets
+from . import test_CALEFunctions, test_Components, test_FormJets
 
 
 def test_LaplacianWavelet():
@@ -31,7 +31,7 @@ def test_LaplacianWavelet():
                 found = CALE.LaplacianWavelet(laplacian, coefficients[:num_points], seed, interval)
                 wavelet_mask = np.zeros(num_points, dtype=int)
                 wavelet_mask[seed] = 1
-                expected = SGWTFunctions.cheby_op(wavelet_mask, np.array(laplacian),
+                expected = CALEFunctions.cheby_op(wavelet_mask, np.array(laplacian),
                                                   coefficients[:num_points], interval)
                 error_message = f"interval = {interval}, seed = {seed}, " + \
                                 f"coefficients = {coefficients[:num_points]}, " + \
@@ -58,7 +58,7 @@ def test_ChebyshevCoefficients_vs_np_cheb():
     tst.assert_allclose(coefficients, np_coeffs, atol=1e-4)
 
 
-class TestCPPMakeLIdx(test_SGWTFunctions.TestMakeLIdx):
+class TestCPPMakeLIdx(test_CALEFunctions.TestMakeLIdx):
     def function(self, particle_rapidities, particle_phis, particle_pts):
         particle_rapidities = list(particle_rapidities)
         particle_phis = list(particle_phis)

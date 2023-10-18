@@ -310,7 +310,7 @@ def make_L_idx(particle_rapidities, particle_phis, particle_pts):
 
 def make_L(particle_rapidities, particle_phis, normalised=True, sigma = 0.15):
     """ Makes a weighted Laplacian from particle rapidities and phis,
-    using the method found in SGWT paper for swiss roll example.
+    using the method found in CALE paper for swiss roll example.
 
     Parameters
     ----------
@@ -355,7 +355,7 @@ def make_L(particle_rapidities, particle_phis, normalised=True, sigma = 0.15):
     return laplacian, l_max_val
 
 
-# called without optional arguments in SGWTFormJets
+# called without optional arguments in CALEFormJets
 def wavelet_approx(L, l_max_val, L_idx,  N_scales = 1, m = 50):
     """ Approximates wavelets of N_scales around point given by L_idx
 
@@ -363,7 +363,7 @@ def wavelet_approx(L, l_max_val, L_idx,  N_scales = 1, m = 50):
     ----------
     L : n x n array of float
         weighted graph Laplacian constructed by the method found in
-        8.2 of SGWT paper
+        8.2 of CALE paper
     l_max_val : float
     N_scales : int (optional)
         Number of scales in the filter bank

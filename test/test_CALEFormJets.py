@@ -1,7 +1,7 @@
 import unittest
 import numpy as np
 import numpy.testing as tst
-from spectraljet import SGWTFormJets
+from spectraljet import CALEFormJets
 from . import test_FormJets
 
 
@@ -12,8 +12,8 @@ complex_pxs = np.random.rand(n_particles)*2. - 1.
 complex_pys = np.random.rand(n_particles)*2. - 1.
 complex_pzs = np.random.rand(n_particles)*2. - 1.
 
-class TestSGWT(unittest.TestCase):
-    to_test = SGWTFormJets.SGWT
+class TestCALE(unittest.TestCase):
+    to_test = CALEFormJets.CALE
     def test_empty(self):
         # Do a few basic clustering to check that logical things happen
         # in clear cut cases.
@@ -77,7 +77,7 @@ class TestSGWT(unittest.TestCase):
         #tst.assert_allclose(jets[1].E[(jets[1].Label != -1)*(jets[1].Parent == -1)], 200.)
         return algo
 
-    def test_SGWT_complex(self):
+    def test_CALE_complex(self):
         # this test is expected to break if the algorithm is changed
         algo = self.to_test.from_kinematics(complex_energies, complex_pxs, complex_pys, complex_pzs,
                                             dict_jet_params = dict(NRounds=15, Sigma=0.1, Cutoff=0.))
@@ -115,5 +115,5 @@ class TestSGWT(unittest.TestCase):
 # TODO, kernal used fro the chebyshev coefficients needs
 # to be the absspline kernal for this to work.
 #
-#class TestSGWTCpp(TestSGWT):
-#    to_test = SGWTFormJets.SGWTCpp
+#class TestCALECpp(TestCALE):
+#    to_test = CALEFormJets.CALECpp

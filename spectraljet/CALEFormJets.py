@@ -1,9 +1,9 @@
 import numpy as np
-from . import FormJets, Constants, SGWTFunctions
+from . import FormJets, Constants, CALEFunctions
 from .cpp_CALE import build
 
 
-class SGWT(FormJets.Partitional):
+class CALE(FormJets.Partitional):
     default_params = {'Sigma': .1,
                       'Cutoff': 0,
                       'Normalised': True,
@@ -24,7 +24,7 @@ class SGWT(FormJets.Partitional):
         """ Runs before allocate """
         print(f"Leaf_Rapidity is {self.Leaf_Rapidity}")
         print(f"Leaf_Phi is {self.Leaf_Phi}")
-        self.laplacien, self.l_max_val = SGWTFunctions.make_L(
+        self.laplacien, self.l_max_val = CALEFunctions.make_L(
                 self.Leaf_Rapidity, self.Leaf_Phi,
                 normalised=self.Normalised, sigma=self.Sigma)
         print(f"Initial laplacian is {self.laplacien}")
@@ -38,7 +38,7 @@ class SGWT(FormJets.Partitional):
         # Cannot have more jets than input particles.
         max_jets = min(self.NRounds, len(self.Leaf_Rapidity))
 
-        l_idx = SGWTFunctions.make_L_idx(self.Leaf_Rapidity, self.Leaf_Phi, self.Leaf_PT)
+        l_idx = CALEFunctions.make_L_idx(self.Leaf_Rapidity, self.Leaf_Phi, self.Leaf_PT)
 
         # Precompute L_idx sum and its sorted indices
         seed_ordering = l_idx.sum(axis=0).argsort()
@@ -60,9 +60,9 @@ class SGWT(FormJets.Partitional):
             wavelet_mask[next_unclustered_idx] = 1
             print(f"next_unclustered_idx is {next_unclustered_idx}")
 
-            _, wp_all = SGWTFunctions.wavelet_approx(self.laplacien, 2, wavelet_mask)
+            _, wp_all = CALEFunctions.wavelet_approx(self.laplacien, 2, wavelet_mask)
             print(f"wavelet_values are {wp_all[0]}")
-            wavelet_values = SGWTFunctions.min_max_scale(np.array(wp_all[0])).flatten()
+            wavelet_values = CALEFunctions.min_max_scale(np.array(wp_all[0])).flatten()
             print(f"Cutoff is {self.Cutoff}")
             print(f"wavelet_values shifted {wavelet_values}")
             below_cutoff_indices = set(np.where(wavelet_values < self.Cutoff)[0])
@@ -84,7 +84,7 @@ class SGWT(FormJets.Partitional):
         return jet_list
 
 
-class SGWTCpp(FormJets.Partitional):
+class CALECpp(FormJets.Partitional):
     default_params = {'Sigma': .1,
                       'Cutoff': 0,
                       'NRounds': 15}
@@ -113,7 +113,7 @@ class SGWTCpp(FormJets.Partitional):
         jet_list = self.cpp.GetJetConstituents()
         return jet_list
 
-FormJets.cluster_classes["SGWT"] = SGWT
-FormJets.multiapply_input["SGWT"] = SGWT
-FormJets.cluster_classes["SGWTCpp"] = SGWTCpp
-FormJets.multiapply_input["SGWTCpp"] = SGWTCpp
+FormJets.cluster_classes["CALE"] = CALE
+FormJets.multiapply_input["CALE"] = CALE
+FormJets.cluster_classes["CALECpp"] = CALECpp
+FormJets.multiapply_input["CALECpp"] = CALECpp

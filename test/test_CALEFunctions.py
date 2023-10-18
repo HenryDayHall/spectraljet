@@ -1,19 +1,19 @@
 import unittest
 import numpy as np
 import numpy.testing as tst
-from spectraljet import SGWTFunctions
+from spectraljet import CALEFunctions
 
 
 def test_set_scales():
-    found = SGWTFunctions.set_scales(1., 2., 0)
+    found = CALEFunctions.set_scales(1., 2., 0)
     assert len(found) == 0
-    found = SGWTFunctions.set_scales(1., 2., 1)
+    found = CALEFunctions.set_scales(1., 2., 1)
     assert len(found) == 1
     tst.assert_allclose(found, [2.])
-    found = SGWTFunctions.set_scales(1., 2., 2)
+    found = CALEFunctions.set_scales(1., 2., 2)
     assert len(found) == 2
     tst.assert_allclose(found, [2., 1.])
-    found = SGWTFunctions.set_scales(1., 2., 3)
+    found = CALEFunctions.set_scales(1., 2., 3)
     assert len(found) == 3
     tst.assert_allclose(found[[0,-1]], [2., 1.])
     assert found[1] > 1. and found[1] < 2.
@@ -22,30 +22,30 @@ def test_set_scales():
 
 def test_kernels():
     #TODO test abspline
-    my_kernel = SGWTFunctions.kernel(0., 'mh')
+    my_kernel = CALEFunctions.kernel(0., 'mh')
     # special case
     tst.assert_allclose(my_kernel, 0.)
-    my_kernel = SGWTFunctions.kernel(1., 'mh')
+    my_kernel = CALEFunctions.kernel(1., 'mh')
     assert my_kernel > 0.
-    my_kernel2 = SGWTFunctions.kernel(2., 'mh')
+    my_kernel2 = CALEFunctions.kernel(2., 'mh')
     # in general, affinity should decrease with distance
     assert my_kernel > my_kernel2
     # calculate one case
     expected = 2*np.exp(-2)
     tst.assert_allclose(my_kernel2, expected)
     # it should also work with arrays
-    found = SGWTFunctions.kernel(np.array([0., 1., 2.]), 'mh')
+    found = CALEFunctions.kernel(np.array([0., 1., 2.]), 'mh')
     assert len(found) == 3
     tst.assert_allclose(found, [0., my_kernel, my_kernel2])
     # and be fine with empty arrays
-    found = SGWTFunctions.kernel(np.array([]), 'mh')
+    found = CALEFunctions.kernel(np.array([]), 'mh')
     assert len(found) == 0
 
 
 def test_filter_design():
     # TODO why do we add an extra filter to the start??
     # first return value is the only one we use right now.
-    found, _, _ = SGWTFunctions.filter_design(2., 1)
+    found, _, _ = CALEFunctions.filter_design(2., 1)
     assert len(found) == 1 + 1
     assert hasattr(found[0], '__call__')
     # check it returns the same shape that went in
@@ -64,15 +64,15 @@ def test_wavelet_approx():
 
 def test_cluster_particles():
     # should be fine with empty lists
-    clusters, cluster_list = SGWTFunctions.cluster_particles([], [], [])
+    clusters, cluster_list = CALEFunctions.cluster_particles([], [], [])
     assert len(clusters) == 0
     assert len(cluster_list) == 0
     # One particle should be in one cluster
-    clusters, cluster_list = SGWTFunctions.cluster_particles([1.], [0.], [5.])
+    clusters, cluster_list = CALEFunctions.cluster_particles([1.], [0.], [5.])
     assert len(clusters) == 1
     assert len(cluster_list) == 1
     # Make two clear clusters
-    clusters, cluster_list = SGWTFunctions.cluster_particles([1., 1., -1., -1.],
+    clusters, cluster_list = CALEFunctions.cluster_particles([1., 1., -1., -1.],
                                                              [0., 0., np.pi, np.pi],
                                                              [5., 5., 5., 5.])
     assert len(clusters) == 4
@@ -87,7 +87,7 @@ def test_cluster_particles():
 
 class TestChebyOp(unittest.TestCase):
     def function(self, *args, **kwargs):
-        return SGWTFunctions.cheby_op(*args, **kwargs)
+        return CALEFunctions.cheby_op(*args, **kwargs)
 
     f = np.array([1, 2, 3, 4])
     L = np.array([[4, -1, -1, -1], [-1, 3, -1, -1], [-1, -1, 3, -1], [-1, -1, -1, 3]])
@@ -215,7 +215,7 @@ class TestChebyOp(unittest.TestCase):
 
 class TestMakeLIdx(unittest.TestCase):
     def function(self, *args, **kwargs):
-        return SGWTFunctions.make_L_idx(*args, **kwargs)
+        return CALEFunctions.make_L_idx(*args, **kwargs)
 
     def test_basic_functionality(self):
         y = [0.5, 1, 1.5]
@@ -297,7 +297,7 @@ class TestMakeLIdx(unittest.TestCase):
 
 class TestChebyCoeff(unittest.TestCase):
     def function(self, *args, **kwargs):
-        return SGWTFunctions.cheby_coeff(*args, **kwargs)
+        return CALEFunctions.cheby_coeff(*args, **kwargs)
 
     def test_even_function(self):
         # Function: f(x) = x^4 on [-1, 1]
@@ -326,10 +326,10 @@ class TestChebyCoeff(unittest.TestCase):
 
 
 """
-class TestSGWT(unittest.TestCase):
+class TestCALE(unittest.TestCase):
 
     def setUp(self):
-        self.sgwt = SGWT()
+        self.sgwt = CALE()
         # Mock data for testing purposes
         self.sgwt.Leaf_Rapidity = np.array([0.1, 0.2, 0.3])
         self.sgwt.Leaf_Phi = np.array([0.4, 0.5, 0.6])
