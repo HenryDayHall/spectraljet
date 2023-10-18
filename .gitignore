@@ -90,3 +90,6 @@ cython_debug/
 
 autofill_memory.csv
 continue
+
+# coverage files
+spectraljet/.coverage

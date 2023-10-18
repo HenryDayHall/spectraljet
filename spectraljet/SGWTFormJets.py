@@ -1,6 +1,6 @@
 import numpy as np
 from . import FormJets, Constants, SGWTFunctions
-from .cpp_sgwj import build
+from .cpp_CALE import build
 
 
 class SGWT(FormJets.Partitional):
@@ -97,7 +97,7 @@ class SGWTCpp(FormJets.Partitional):
         Assigns internal functions needed in the clustering.
         Assumes the hyperparams have been set.
         """
-        build_dir = Constants.sgwj_build_dir
+        build_dir = Constants.CALE_build_dir
         build.build(build_dir, force_rebuild = False)
         cpp_module = build.get_module(build_dir)
         self.cpp = cpp_module.Cluster(self.Sigma, self.Cutoff, self.NRounds)

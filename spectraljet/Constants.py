@@ -78,5 +78,5 @@ W_mass = 80.4
 # Default directory for compiling SGWJ
 import os as _os
 _this_dir = _os.path.dirname(_os.path.abspath(__file__))
-sgwj_build_dir = _os.path.join(_this_dir, "build_sgwj")
+CALE_build_dir = _os.path.join(_this_dir, "build_CALE")
 

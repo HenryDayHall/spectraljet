@@ -1,18 +1,18 @@
 import numpy as np
 from numpy import testing as tst
 from spectraljet import Constants, FormJets, SGWTFunctions
-from spectraljet.spectraljet.cpp_sgwj import build
+from spectraljet.spectraljet.cpp_CALE import build
 
-build_dir = Constants.sgwj_build_dir
+build_dir = Constants.CALE_build_dir
 build.build(build_dir, force_rebuild = True)
-sgwj = build.get_module(build_dir)
+CALE = build.get_module(build_dir)
 
 from . import test_SGWTFunctions, test_Components, test_FormJets
 
 
 def test_LaplacianWavelet():
     # shouldn't choke on an empty laplacian
-    found = sgwj.LaplacianWavelet([], [1.], 0, [-1, 1])
+    found = CALE.LaplacianWavelet([], [1.], 0, [-1, 1])
     assert len(found) == 0
     # This can be compared to cheby_op, as they fill the same role
     intervals = [[-1, 1], [0, 2]]
@@ -23,12 +23,12 @@ def test_LaplacianWavelet():
                    [-0.1, 1., 0., -0.5],
                    [-0.5, 0., 1., -0.1],
                    [0., -0.5, -0.1, 1.]])
-    coefficients = sgwj.ChebyshevCoefficients(4);
+    coefficients = CALE.ChebyshevCoefficients(4);
     for interval in intervals:
         for laplacian in laplacians:
             num_points = len(laplacian)
             for seed in range(num_points):
-                found = sgwj.LaplacianWavelet(laplacian, coefficients[:num_points], seed, interval)
+                found = CALE.LaplacianWavelet(laplacian, coefficients[:num_points], seed, interval)
                 wavelet_mask = np.zeros(num_points, dtype=int)
                 wavelet_mask[seed] = 1
                 expected = SGWTFunctions.cheby_op(wavelet_mask, np.array(laplacian),
@@ -54,7 +54,7 @@ def test_ChebyshevCoefficients_vs_np_cheb():
     interval_max = 1
     x = np.linspace(interval_min, interval_max, grid_order)
     np_coeffs = np.polynomial.chebyshev.chebfit(x, f(x), 5)
-    coefficients = sgwj.ChebyshevCoefficients(5, grid_order, interval_min, interval_max)
+    coefficients = CALE.ChebyshevCoefficients(5, grid_order, interval_min, interval_max)
     tst.assert_allclose(coefficients, np_coeffs, atol=1e-4)
 
 
@@ -63,29 +63,29 @@ class TestCPPMakeLIdx(test_SGWTFunctions.TestMakeLIdx):
         particle_rapidities = list(particle_rapidities)
         particle_phis = list(particle_phis)
         particle_pts = list(particle_pts)
-        metric = sgwj.JetMetrics.antikt
-        distances2 = sgwj.NamedDistance2Matrix(particle_pts, particle_rapidities, particle_phis, metric)
+        metric = CALE.JetMetrics.antikt
+        distances2 = CALE.NamedDistance2Matrix(particle_pts, particle_rapidities, particle_phis, metric)
         return np.sqrt(distances2)
 
 
 def test_VectorAddition():
     # Two empty vectors should make another empty vector
-    assert len(sgwj.VectorAddition([], [])) == 0
+    assert len(CALE.VectorAddition([], [])) == 0
     # Two vectors with 0 in should make another vectors with 0 in
-    tst.assert_allclose(sgwj.VectorAddition([0,0,0], [0,0,0]), [0,0,0])
+    tst.assert_allclose(CALE.VectorAddition([0,0,0], [0,0,0]), [0,0,0])
     # Two vectors with 1 in should make another vectors with 2 in
-    tst.assert_allclose(sgwj.VectorAddition([1,1,1], [1,1,1]), [2,2,2])
+    tst.assert_allclose(CALE.VectorAddition([1,1,1], [1,1,1]), [2,2,2])
     # A vector of -1 and a vector of 1 should make a vector of 0
-    tst.assert_allclose(sgwj.VectorAddition([-1,-1,-1], [1,1,1]), [0,0,0])
+    tst.assert_allclose(CALE.VectorAddition([-1,-1,-1], [1,1,1]), [0,0,0])
     # One last test
-    tst.assert_allclose(sgwj.VectorAddition([1,2,3], [4,5,6]), [5,7,9])
+    tst.assert_allclose(CALE.VectorAddition([1,2,3], [4,5,6]), [5,7,9])
 
 
 def test_MatrixDotVector():
     # Empty matrix and empty vector should make an empty vector
-    assert len(sgwj.MatrixDotVector([], [])) == 0
+    assert len(CALE.MatrixDotVector([], [])) == 0
     # Length one matrix and length one vector should make a length one vector
-    tst.assert_allclose(sgwj.MatrixDotVector([[1]], [1]), [1])
+    tst.assert_allclose(CALE.MatrixDotVector([[1]], [1]), [1])
     # create a range of matrices and a range of vectors
     length_2_matrices = ([[0,0],[0,0]],
                          [[1,2],[3,4]],
@@ -101,7 +101,7 @@ def test_MatrixDotVector():
     # Test all combinations of the above against numpy
     for matrix in length_2_matrices:
         for vector in length_2_vectors:
-            tst.assert_allclose(sgwj.MatrixDotVector(matrix, vector), np.dot(matrix, vector))
+            tst.assert_allclose(CALE.MatrixDotVector(matrix, vector), np.dot(matrix, vector))
     # again but length 3
     length_3_matrices = ([[0,0,0],[0,0,0],[0,0,0]],
                          [[1,2,3],[4,5,6],[7,8,9]])
@@ -110,41 +110,41 @@ def test_MatrixDotVector():
     # Test all combinations of the above against numpy
     for matrix in length_3_matrices:
         for vector in length_3_vectors:
-            tst.assert_allclose(sgwj.MatrixDotVector(matrix, vector), np.dot(matrix, vector))
+            tst.assert_allclose(CALE.MatrixDotVector(matrix, vector), np.dot(matrix, vector))
 
 
 
 class TestCPPAngularDistance(test_Components.TestAngularDistance):
     def function(self, a, b):
         if hasattr(a, '__iter__'):
-            return [sgwj.AngularDistance(a_i, b_i) for a_i, b_i in zip(a, b)]
-        return sgwj.AngularDistance(a, b)
+            return [CALE.AngularDistance(a_i, b_i) for a_i, b_i in zip(a, b)]
+        return CALE.AngularDistance(a, b)
 
 
 def test_CambridgeAachenDistance2():
     # Too complicated to import existing test due to matrix structures;
     # just test a few cases
-    found = sgwj.CambridgeAachenDistance2(0, 0, 0, 0)
+    found = CALE.CambridgeAachenDistance2(0, 0, 0, 0)
     tst.assert_allclose(found, 0)
-    found = sgwj.CambridgeAachenDistance2(1, 0, 0, 0)
+    found = CALE.CambridgeAachenDistance2(1, 0, 0, 0)
     tst.assert_allclose(found, 1)
-    found = sgwj.CambridgeAachenDistance2(0, 1, 0, 0)
+    found = CALE.CambridgeAachenDistance2(0, 1, 0, 0)
     tst.assert_allclose(found, 1)
-    found = sgwj.CambridgeAachenDistance2(0, 0, 1, 0)
+    found = CALE.CambridgeAachenDistance2(0, 0, 1, 0)
     tst.assert_allclose(found, 1)
-    found = sgwj.CambridgeAachenDistance2(0, 0, 0, 1)
+    found = CALE.CambridgeAachenDistance2(0, 0, 0, 1)
     tst.assert_allclose(found, 1)
-    found = sgwj.CambridgeAachenDistance2(1, 1, 0, 0)
+    found = CALE.CambridgeAachenDistance2(1, 1, 0, 0)
     tst.assert_allclose(found, 2)
-    found = sgwj.CambridgeAachenDistance2(1, 0, 1, 0)
+    found = CALE.CambridgeAachenDistance2(1, 0, 1, 0)
     tst.assert_allclose(found, 0)
-    found = sgwj.CambridgeAachenDistance2(1, 0, 0, 1)
+    found = CALE.CambridgeAachenDistance2(1, 0, 0, 1)
     tst.assert_allclose(found, 2)
-    found = sgwj.CambridgeAachenDistance2(2.5, 0, 0, 0)
+    found = CALE.CambridgeAachenDistance2(2.5, 0, 0, 0)
     tst.assert_allclose(found, 6.25)
-    found = sgwj.CambridgeAachenDistance2(0, -2.5, 0, 0)
+    found = CALE.CambridgeAachenDistance2(0, -2.5, 0, 0)
     tst.assert_allclose(found, 6.25)
-    found = sgwj.CambridgeAachenDistance2(0, np.pi, 0, 1.-np.pi)
+    found = CALE.CambridgeAachenDistance2(0, np.pi, 0, 1.-np.pi)
     tst.assert_allclose(found, 1.)
 
 
@@ -159,7 +159,7 @@ def test_GeneralisedKtDistance2():
     input_pts += input_pts
     n_particles = len(input_rapidities)
     ca2_from_python = FormJets.ca_distances2(input_rapidities, input_phis)
-    metric_dict = {-1: sgwj.JetMetrics.antikt, 0: sgwj.JetMetrics.cambridge_aachen, 1: sgwj.JetMetrics.kt}
+    metric_dict = {-1: CALE.JetMetrics.antikt, 0: CALE.JetMetrics.cambridge_aachen, 1: CALE.JetMetrics.kt}
     for kt_factor in [-1, 0, 0.5, 1]:
         kt_from_python = FormJets.genkt_factor(kt_factor, np.array(input_pts))
         python_result = np.sqrt(ca2_from_python) * kt_from_python
@@ -167,7 +167,7 @@ def test_GeneralisedKtDistance2():
         # First test the pairwise version
         for row in range(n_particles):
             for col in range(row):
-                cpp_distance = sgwj.GeneralisedKtDistance2(input_pts[row],
+                cpp_distance = CALE.GeneralisedKtDistance2(input_pts[row],
                                                            input_rapidities[row],
                                                            input_phis[row],
                                                            input_pts[col],
@@ -185,7 +185,7 @@ def test_GeneralisedKtDistance2():
                 tst.assert_allclose(cpp_distance, python_distance,
                                     err_msg = error_message+str(cpp_distance))
                 if metric is not None:
-                    cpp_distance = sgwj.NamedDistance2(input_pts[row],
+                    cpp_distance = CALE.NamedDistance2(input_pts[row],
                                                        input_rapidities[row],
                                                        input_phis[row],
                                                        input_pts[col],
@@ -196,7 +196,7 @@ def test_GeneralisedKtDistance2():
                     tst.assert_allclose(cpp_distance, python_distance,
                                         err_msg = error_message+str(cpp_distance))
         # Now test the matrix version
-        cpp_result = sgwj.GeneralisedKtDistance2Matrix(input_pts,
+        cpp_result = CALE.GeneralisedKtDistance2Matrix(input_pts,
                                                        input_rapidities,
                                                        input_phis,
                                                        kt_factor)
@@ -208,7 +208,7 @@ def test_GeneralisedKtDistance2():
                 cpp_result[i][i] = np.nan
         tst.assert_allclose(python_result, cpp_result)
         if metric is not None:
-            cpp_result = sgwj.NamedDistance2Matrix(input_pts,
+            cpp_result = CALE.NamedDistance2Matrix(input_pts,
                                                    input_rapidities,
                                                    input_phis,
                                                    metric)
@@ -228,7 +228,7 @@ class TestCPPExpAffinity(test_FormJets.TestExpAffinity):
             raise NotImplementedError("Can't avoid that in c++")
         if hasattr(distances2, "tolist"):
             distances2 = distances2.tolist()
-        return sgwj.Affinities(distances2, sigma)
+        return CALE.Affinities(distances2, sigma)
 
     def test_assymetric(self):
         pass  # disable these tests as they are not implemented in c++
@@ -242,7 +242,7 @@ def test_Laplacian():
     input_distances2 = []
     sigma = 1
     normalised = True
-    found = sgwj.Laplacian(input_distances2, sigma, normalised)
+    found = CALE.Laplacian(input_distances2, sigma, normalised)
     found = np.array(found)
     assert len(found.flatten()) == 0
     # can't really import the existing test as it starts from an
@@ -254,10 +254,10 @@ def test_Laplacian():
     for input_distances2 in distance2_matrices:
         for sigma in sigmas:
             exp_affinity = FormJets.exp_affinity(np.array(input_distances2), sigma)
-            found = sgwj.Laplacian(input_distances2, sigma, True)
+            found = CALE.Laplacian(input_distances2, sigma, True)
             python_version = FormJets.symmetric_laplacian(exp_affinity)
             tst.assert_allclose(found, python_version)
-            found = sgwj.Laplacian(input_distances2, sigma, False)
+            found = CALE.Laplacian(input_distances2, sigma, False)
             python_version = FormJets.unnormed_laplacian(exp_affinity)
             tst.assert_allclose(found, python_version)
 
@@ -269,106 +269,106 @@ def test_PxPyPz_PtRapPhi():
     energy = 1
     ptrapphi = (0, 0, 0)
     pxpypz = (0, 0, 0)
-    found = sgwj.PxPyPz(energy, *ptrapphi)
+    found = CALE.PxPyPz(energy, *ptrapphi)
     tst.assert_allclose(found, pxpypz, atol=atol)
-    found = sgwj.PtRapPhi(energy, *pxpypz)
+    found = CALE.PtRapPhi(energy, *pxpypz)
     tst.assert_allclose(found[:2], ptrapphi[:2], atol=atol)
     energy = 1
     ptrapphi = (0, 0, 1)
     pxpypz = (0, 0, 0)
-    found = sgwj.PxPyPz(energy, *ptrapphi)
+    found = CALE.PxPyPz(energy, *ptrapphi)
     tst.assert_allclose(found,pxpypz, atol=atol)
-    found = sgwj.PtRapPhi(energy, *pxpypz)
+    found = CALE.PtRapPhi(energy, *pxpypz)
     tst.assert_allclose(found[:2], ptrapphi[:2], atol=atol)
     energy = 1
     ptrapphi = (1, 0, 0)
     pxpypz = (1, 0, 0)
-    found = sgwj.PxPyPz(energy, *ptrapphi)
+    found = CALE.PxPyPz(energy, *ptrapphi)
     tst.assert_allclose(found,pxpypz, atol=atol)
-    found = sgwj.PtRapPhi(energy, *pxpypz)
+    found = CALE.PtRapPhi(energy, *pxpypz)
     tst.assert_allclose(found[:2], ptrapphi[:2], atol=atol)
     energy = 1
     ptrapphi = (1, 0, np.pi/2.)
     pxpypz = (0, 1, 0)
-    found = sgwj.PxPyPz(energy, *ptrapphi)
+    found = CALE.PxPyPz(energy, *ptrapphi)
     tst.assert_allclose(found,pxpypz, atol=atol)
-    found = sgwj.PtRapPhi(energy, *pxpypz)
+    found = CALE.PtRapPhi(energy, *pxpypz)
     tst.assert_allclose(found, ptrapphi, atol=atol)
     energy = 2
     ptrapphi = (1, 0, 0)
     pxpypz = (1, 0, 0)
-    found = sgwj.PxPyPz(energy, *ptrapphi)
+    found = CALE.PxPyPz(energy, *ptrapphi)
     tst.assert_allclose(found,pxpypz, atol=atol)
-    found = sgwj.PtRapPhi(energy, *pxpypz)
+    found = CALE.PtRapPhi(energy, *pxpypz)
     tst.assert_allclose(found, ptrapphi, atol=atol)
     energy = 3
     ptrapphi = (2, 0, 0)
     pxpypz = (2, 0, 0)
-    found = sgwj.PxPyPz(energy, *ptrapphi)
+    found = CALE.PxPyPz(energy, *ptrapphi)
     tst.assert_allclose(found,pxpypz, atol=atol)
-    found = sgwj.PtRapPhi(energy, *pxpypz)
+    found = CALE.PtRapPhi(energy, *pxpypz)
     tst.assert_allclose(found, ptrapphi, atol=atol)
     energy = 1
     ptrapphi = (1, 0, -np.pi/2)
     pxpypz = (0, -1, 0)
-    found = sgwj.PxPyPz(energy, *ptrapphi)
+    found = CALE.PxPyPz(energy, *ptrapphi)
     tst.assert_allclose(found, pxpypz, atol=atol)
-    found = sgwj.PtRapPhi(energy, *pxpypz)
+    found = CALE.PtRapPhi(energy, *pxpypz)
     tst.assert_allclose(found, ptrapphi, atol=atol)
     energy = 1
     ptrapphi = (1, 0, np.pi)
     pxpypz = (-1, 0, 0)
-    found = sgwj.PxPyPz(energy, *ptrapphi)
+    found = CALE.PxPyPz(energy, *ptrapphi)
     tst.assert_allclose(found,pxpypz, atol=atol)
-    found = sgwj.PtRapPhi(energy, *pxpypz)
+    found = CALE.PtRapPhi(energy, *pxpypz)
     tst.assert_allclose(found, ptrapphi, atol=atol)
     energy = 1
     ptrapphi = (1, 0, 2*np.pi)
     pxpypz = (1, 0, 0)
-    found = sgwj.PxPyPz(energy, *ptrapphi)
+    found = CALE.PxPyPz(energy, *ptrapphi)
     tst.assert_allclose(found,pxpypz, atol=atol)
-    found = sgwj.PtRapPhi(energy, *pxpypz)
+    found = CALE.PtRapPhi(energy, *pxpypz)
     # 2pi is 0
     tst.assert_allclose(found, [1, 0, 0], atol=atol)
     energy = 1
     ptrapphi = (1, 1, 0)
     pz = 1*(np.exp(2*1) - 1)/(np.exp(2*1) + 1)
     pxpypz = (1, 0, pz)
-    found = sgwj.PxPyPz(energy, *ptrapphi)
+    found = CALE.PxPyPz(energy, *ptrapphi)
     tst.assert_allclose(found, pxpypz, atol=atol)
-    found = sgwj.PtRapPhi(energy, *pxpypz)
+    found = CALE.PtRapPhi(energy, *pxpypz)
     tst.assert_allclose(found, ptrapphi, atol=atol)
     energy = 5
     ptrapphi = (1, 1, 0)
     pz = 5*(np.exp(2*1) - 1)/(np.exp(2*1) + 1)
     pxpypz = (1, 0, pz)
-    found = sgwj.PxPyPz(energy, *ptrapphi)
+    found = CALE.PxPyPz(energy, *ptrapphi)
     tst.assert_allclose(found,pxpypz, atol=atol)
-    found = sgwj.PtRapPhi(energy, *pxpypz)
+    found = CALE.PtRapPhi(energy, *pxpypz)
     tst.assert_allclose(found, ptrapphi, atol=atol)
     energy = 1
     ptrapphi = (1, 4, 0)
     pz = 1*(np.exp(2*4) - 1)/(np.exp(2*4) + 1)
     pxpypz = (1, 0, pz)
-    found = sgwj.PxPyPz(energy, *ptrapphi)
+    found = CALE.PxPyPz(energy, *ptrapphi)
     tst.assert_allclose(found,pxpypz, atol=atol)
-    found = sgwj.PtRapPhi(energy, *pxpypz)
+    found = CALE.PtRapPhi(energy, *pxpypz)
     tst.assert_allclose(found, ptrapphi, atol=atol)
     energy = 1
     ptrapphi = (1, -4, np.pi/4)
     pz = -1*(np.exp(2*4) - 1)/(np.exp(2*4) + 1)
     pxpypz = (1/np.sqrt(2), 1/np.sqrt(2), pz)
-    found = sgwj.PxPyPz(energy, *ptrapphi)
+    found = CALE.PxPyPz(energy, *ptrapphi)
     tst.assert_allclose(found,pxpypz, atol=atol)
-    found = sgwj.PtRapPhi(energy, *pxpypz)
+    found = CALE.PtRapPhi(energy, *pxpypz)
     tst.assert_allclose(found, ptrapphi, atol=atol)
     energy = 1
     ptrapphi = (1, -4, 3*np.pi/4)
     pz = -1*(np.exp(2*4) - 1)/(np.exp(2*4) + 1)
     pxpypz = (-1/np.sqrt(2), 1/np.sqrt(2), pz)
-    found = sgwj.PxPyPz(energy, *ptrapphi)
+    found = CALE.PxPyPz(energy, *ptrapphi)
     tst.assert_allclose(found,pxpypz, atol=atol)
-    found = sgwj.PtRapPhi(energy, *pxpypz)
+    found = CALE.PtRapPhi(energy, *pxpypz)
     tst.assert_allclose(found, ptrapphi, atol=atol)
 
 
