@@ -1,7 +1,7 @@
 import numpy as np
 from numpy import testing as tst
 from spectraljet import Constants, FormJets, SGWTFunctions
-from spectraljet.cpp_sgwj import build
+from spectraljet.spectraljet.cpp_sgwj import build
 
 build_dir = Constants.sgwj_build_dir
 build.build(build_dir, force_rebuild = True)
@@ -40,7 +40,6 @@ def test_LaplacianWavelet():
 
 
 
-
 def test_ChebyshevCoefficients_vs_np_cheb():
     # There is no point importing the chebyshev tests,
     # as they are for application to a generic function,
@@ -65,7 +64,8 @@ class TestCPPMakeLIdx(test_SGWTFunctions.TestMakeLIdx):
         particle_phis = list(particle_phis)
         particle_pts = list(particle_pts)
         metric = sgwj.JetMetrics.antikt
-        return sgwj.NamedDistanceMatrix(particle_pts, particle_rapidities, particle_phis, metric)
+        distances2 = sgwj.NamedDistance2Matrix(particle_pts, particle_rapidities, particle_phis, metric)
+        return np.sqrt(distances2)
 
 
 def test_VectorAddition():
@@ -148,7 +148,7 @@ def test_CambridgeAachenDistance2():
     tst.assert_allclose(found, 1.)
 
 
-def test_GeneralisedKtDistance():
+def test_GeneralisedKtDistance2():
     # Its too complicated to import the existing test due to matrix structures;
     # But we can compare outputs with the python version
     input_rapidities = [0, 1., 2., 3., -1., -2., -3.]
@@ -167,13 +167,14 @@ def test_GeneralisedKtDistance():
         # First test the pairwise version
         for row in range(n_particles):
             for col in range(row):
-                cpp_distance = sgwj.GeneralisedKtDistance(input_pts[row],
-                                                          input_rapidities[row],
-                                                          input_phis[row],
-                                                          input_pts[col],
-                                                          input_rapidities[col],
-                                                          input_phis[col],
-                                                          kt_factor)
+                cpp_distance = sgwj.GeneralisedKtDistance2(input_pts[row],
+                                                           input_rapidities[row],
+                                                           input_phis[row],
+                                                           input_pts[col],
+                                                           input_rapidities[col],
+                                                           input_phis[col],
+                                                           kt_factor)
+                cpp_distance = np.sqrt(cpp_distance)
                 python_distance = python_result[row, col]
                 error_message = (f"kt_factor = {kt_factor}, pt_row = {input_pts[row]}, "
                                  + f"pt_col = {input_pts[col]}, "
@@ -184,20 +185,22 @@ def test_GeneralisedKtDistance():
                 tst.assert_allclose(cpp_distance, python_distance,
                                     err_msg = error_message+str(cpp_distance))
                 if metric is not None:
-                    cpp_distance = sgwj.NamedDistance(input_pts[row],
-                                                      input_rapidities[row],
-                                                      input_phis[row],
-                                                      input_pts[col],
-                                                      input_rapidities[col],
-                                                      input_phis[col],
-                                                      metric)
+                    cpp_distance = sgwj.NamedDistance2(input_pts[row],
+                                                       input_rapidities[row],
+                                                       input_phis[row],
+                                                       input_pts[col],
+                                                       input_rapidities[col],
+                                                       input_phis[col],
+                                                       metric)
+                    cpp_distance = np.sqrt(cpp_distance)
                     tst.assert_allclose(cpp_distance, python_distance,
                                         err_msg = error_message+str(cpp_distance))
         # Now test the matrix version
-        cpp_result = sgwj.GeneralisedKtDistanceMatrix(input_pts,
-                                                      input_rapidities,
-                                                      input_phis,
-                                                      kt_factor)
+        cpp_result = sgwj.GeneralisedKtDistance2Matrix(input_pts,
+                                                       input_rapidities,
+                                                       input_phis,
+                                                       kt_factor)
+        cpp_result = np.sqrt(cpp_result)
 
         # generally don't care if there are nans on the diagonal that don't match
         for i in range(n_particles):
@@ -205,10 +208,11 @@ def test_GeneralisedKtDistance():
                 cpp_result[i][i] = np.nan
         tst.assert_allclose(python_result, cpp_result)
         if metric is not None:
-            cpp_result = sgwj.NamedDistanceMatrix(input_pts,
-                                                  input_rapidities,
-                                                  input_phis,
-                                                  metric)
+            cpp_result = sgwj.NamedDistance2Matrix(input_pts,
+                                                   input_rapidities,
+                                                   input_phis,
+                                                   metric)
+            cpp_result = np.sqrt(cpp_result)
             for i in range(n_particles):
                 if np.isnan(python_result[i,i]):
                     cpp_result[i][i] = np.nan

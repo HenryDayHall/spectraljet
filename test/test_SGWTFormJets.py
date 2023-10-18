@@ -2,6 +2,7 @@ import unittest
 import numpy as np
 import numpy.testing as tst
 from spectraljet import SGWTFormJets
+from . import test_FormJets
 
 
 np.random.seed(42)
@@ -108,10 +109,11 @@ class TestSGWT(unittest.TestCase):
                            [1.373854057635769621e+00, 1.153086572956853878e-02, -2.781180254985658351e+00, 6.035211169562503386e+01, -1.285585949457234589e+00, -4.845035998219304751e-01, 6.958812550738078251e-01, np.nan, 8.000000000000000000e+00],
                            [7.169851785485583662e-01, -1.525864024174706235e-01, -2.148447868759928880e+00, 2.580836121681994832e+00, -3.915155140809245538e-01, -6.006524356832805278e-01, -3.907724616532586293e-01, np.nan, 1.000000000000000000e+00],
                            [9.985839975171026950e-01, -1.318197997449831009e-02, -2.002186256784725504e+00, 9.080725777960454437e+00, -4.175417196039161727e-01, -9.070991745600045508e-01, -1.196950125207973947e-01, np.nan, 1.000000000000000000e+00]])
-        tst.assert_allclose(algo._ints[:len(ints)], ints, atol=1e-6)
-        tst.assert_allclose(algo._floats[:len(floats)], floats, atol=1e-6)
+        test_FormJets.match_ints_floats(ints, floats,
+                                        algo._ints[:len(ints)], algo._floats[:len(floats)])
 
-
+# TODO, kernal used fro the chebyshev coefficients needs
+# to be the absspline kernal for this to work.
 #
 #class TestSGWTCpp(TestSGWT):
 #    to_test = SGWTFormJets.SGWTCpp

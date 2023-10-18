@@ -199,6 +199,11 @@ def cheby_coeff(g, m, N=None, arange=(-1,1)):
     if N is None:
         N = m+1
 
+    print(f"g = {g}")
+    print(f"m = {m}")
+    print(f"N = {N}")
+    print(f"arange = {arange}")
+
     x = np.linspace(arange[0], arange[1], N)
     y = g(x)
     
@@ -303,7 +308,7 @@ def make_L_idx(particle_rapidities, particle_phis, particle_pts):
     return L_idx
 
 
-def make_L(particle_rapidities, particle_phis, normalised=True, s = 0.15):
+def make_L(particle_rapidities, particle_phis, normalised=True, sigma = 0.15):
     """ Makes a weighted Laplacian from particle rapidities and phis,
     using the method found in SGWT paper for swiss roll example.
 
@@ -313,7 +318,7 @@ def make_L(particle_rapidities, particle_phis, normalised=True, s = 0.15):
         Row of rapidity values.
     phi : array of float
         Row of phi values.
-    s : int (optional)
+    sigma : int (optional)
         (sigma) level of weight scaling in the graph,
         larger values means points further away from
         delta will have larger coefficients 
@@ -326,28 +331,31 @@ def make_L(particle_rapidities, particle_phis, normalised=True, s = 0.15):
         Largest eigenvalue
     """
 
-    d = FormJets.ca_distances2(particle_rapidities, particle_phis)
-    A = FormJets.exp_affinity(d, s)
-    #A = np.exp(-d**2 / (2 * s**2))
-    #np.fill_diagonal(A, 0.)
-    D = np.diag(np.sum(A, axis=0))
-    L = D - A
+    distances2 = FormJets.ca_distances2(particle_rapidities, particle_phis)
+    print(f"distances2 are {distances2}")
+    print(f"distances are {np.sqrt(distances2)}")
+    affinities = FormJets.exp_affinity(distances2, sigma)
+    print(f"affinities are {affinities}")
+    #affinities = np.exp(-distances2**2 / (2 * sigma**2))
+    #np.fill_diagonal(affinities, 0.)
+    diagonals = np.diag(np.sum(affinities, axis=0))
+    laplacian = diagonals - affinities
 
     if normalised:
-        #L = (np.linalg.inv(D)**0.5) @ L @ (np.linalg.inv(D)**0.5)
-        diags = np.sum(A, axis=0)
+        #laplacian = (np.linalg.inv(diagonals)**0.5) @ laplacian @ (np.linalg.inv(diagonals)**0.5)
+        diags = np.sum(affinities, axis=0)
         diags_sqrt = 1.0 / np.sqrt(diags)
         diags_sqrt[np.isinf(diags_sqrt)] = 0
-        D = np.diag(diags_sqrt)
-        L = D @ (L @ D)
+        diagonals = np.diag(diags_sqrt)
+        laplacian = diagonals @ (laplacian @ diagonals)
         l_max_val = 2.
     else:
-        l_max_val = max_eigenvalue(L)
+        l_max_val = max_eigenvalue(laplacian)
 
-    return L, l_max_val
+    return laplacian, l_max_val
 
 
-
+# called without optional arguments in SGWTFormJets
 def wavelet_approx(L, l_max_val, L_idx,  N_scales = 1, m = 50):
     """ Approximates wavelets of N_scales around point given by L_idx
 
@@ -382,6 +390,7 @@ def wavelet_approx(L, l_max_val, L_idx,  N_scales = 1, m = 50):
     # Compute transform of delta at one vertex
     # Vertex to center wavelets to be shown
     d = L_idx.reshape(-1,1)
+    print(f"chebyshef_coefficients = {c}")
 
     # forward transform, using chebyshev approximation
     wp_all = cheby_op(d, L, c, arange)
@@ -406,7 +415,7 @@ def cluster_particles(particle_rapidities, particle_phis, particle_pts, s=0.11, 
     cluster_list = []
 
     # Generate the laplacian matrix
-    L, l_max_val = make_L(particle_rapidities, particle_phis, normalised=normalised, s=s)
+    L, l_max_val = make_L(particle_rapidities, particle_phis, normalised=normalised, sigma=s)
 
     # Convert particle data to appropriate format
     particle_data = np.array((particle_rapidities, particle_phis, particle_pts))
