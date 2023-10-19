@@ -60,9 +60,6 @@ def test_filter_design():
     tst.assert_allclose(output2[0], output[0])
 
 
-def test_wavelet_approx():
-    pass  #TODO
-
 
 
 def test_cluster_particles():
