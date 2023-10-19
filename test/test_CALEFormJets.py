@@ -77,7 +77,7 @@ class TestCALE(unittest.TestCase):
         #tst.assert_allclose(jets[1].E[(jets[1].Label != -1)*(jets[1].Parent == -1)], 200.)
         return algo
 
-    def test_CALE_complex(self):
+    def test_complex(self):
         # this test is expected to break if the algorithm is changed
         algo = self.to_test.from_kinematics(complex_energies, complex_pxs, complex_pys, complex_pzs,
                                             dict_jet_params = dict(NRounds=15, Sigma=0.1, Cutoff=0.))
@@ -114,6 +114,6 @@ class TestCALE(unittest.TestCase):
 
 # TODO, kernal used fro the chebyshev coefficients needs
 # to be the absspline kernal for this to work.
-#
-#class TestCALECpp(TestCALE):
-#    to_test = CALEFormJets.CALECpp
+
+class TestCALECpp(TestCALE):
+    to_test = CALEFormJets.CALECpp

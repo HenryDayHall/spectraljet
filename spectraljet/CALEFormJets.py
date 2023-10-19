@@ -22,12 +22,9 @@ class CALE(FormJets.Partitional):
 
     def setup_internal(self):
         """ Runs before allocate """
-        print(f"Leaf_Rapidity is {self.Leaf_Rapidity}")
-        print(f"Leaf_Phi is {self.Leaf_Phi}")
         self.laplacien, self.l_max_val = CALEFunctions.make_L(
                 self.Leaf_Rapidity, self.Leaf_Phi,
                 normalised=self.Normalised, sigma=self.Sigma)
-        print(f"Initial laplacian is {self.laplacien}")
 
     def allocate(self):
         """Sort the labels into exclusive jets"""
@@ -45,8 +42,6 @@ class CALE(FormJets.Partitional):
         unclustered_idx_pointer = 0 
 
         round_counter = 0
-        print(f"laplacian is {self.laplacien}")
-        print(f"seed_ordering is {seed_ordering}")
 
         while unclustered_idx_pointer < len(seed_ordering) and round_counter < max_jets:
             
@@ -58,17 +53,12 @@ class CALE(FormJets.Partitional):
                 continue
             wavelet_mask = np.zeros_like(self.Leaf_Label, dtype=int)
             wavelet_mask[next_unclustered_idx] = 1
-            print(f"next_unclustered_idx is {next_unclustered_idx}")
 
             _, wp_all = CALEFunctions.wavelet_approx(self.laplacien, 2, wavelet_mask)
-            print(f"wavelet_values are {wp_all[0]}")
             wavelet_values = CALEFunctions.min_max_scale(np.array(wp_all[0])).flatten()
-            print(f"Cutoff is {self.Cutoff}")
-            print(f"wavelet_values shifted {wavelet_values}")
             below_cutoff_indices = set(np.where(wavelet_values < self.Cutoff)[0])
             available_particles = set(np.where(available_mask)[0])
             labels = list(below_cutoff_indices & available_particles)
-            print(f"labels are {labels}")
 
             if labels:  # If we have some labels that match the criteria
                 jet_labels = self.Leaf_Label[labels]

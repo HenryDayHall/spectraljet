@@ -40,22 +40,34 @@ def test_LaplacianWavelet():
 
 
 
-def test_ChebyshevCoefficients_vs_np_cheb():
+def test_ChebyshevCoefficients_vs_py_cheb():
     # There is no point importing the chebyshev tests,
     # as they are for application to a generic function,
     # but we specifically want the coefficients of f(x) = exp(-x)
-    # Using numpy's chebfit function to compute the coefficients
-    # For the function f(x) = x^3
     def f(x):
         return np.exp(-x)
 
     grid_order = 400
     interval_min = -1
     interval_max = 1
-    x = np.linspace(interval_min, interval_max, grid_order)
-    np_coeffs = np.polynomial.chebyshev.chebfit(x, f(x), 5)
-    coefficients = CALE.ChebyshevCoefficients(5, grid_order, interval_min, interval_max)
-    tst.assert_allclose(coefficients, np_coeffs, atol=1e-4)
+
+    n_coeffs = 5
+    py_coeffs = CALEFunctions.cheby_coeff(f, n_coeffs, grid_order, (interval_min, interval_max))
+    coefficients = CALE.ChebyshevCoefficients(n_coeffs, grid_order, interval_min, interval_max)
+    tst.assert_allclose(coefficients, py_coeffs, atol=1e-4)
+
+    n_coeffs = grid_order + 1
+    py_coeffs = CALEFunctions.cheby_coeff(f, n_coeffs, grid_order, (interval_min, interval_max))
+    coefficients = CALE.ChebyshevCoefficients(n_coeffs, grid_order, interval_min, interval_max)
+    tst.assert_allclose(coefficients, py_coeffs, atol=1e-4)
+
+    grid_order = 50
+    interval_min = 0
+    interval_max = 2
+    n_coeffs = grid_order + 1
+    py_coeffs = CALEFunctions.cheby_coeff(f, n_coeffs, grid_order, (interval_min, interval_max))
+    coefficients = CALE.ChebyshevCoefficients(n_coeffs, grid_order, interval_min, interval_max)
+    tst.assert_allclose(coefficients, py_coeffs, atol=1e-4)
 
 
 class TestCPPMakeLIdx(test_CALEFunctions.TestMakeLIdx):

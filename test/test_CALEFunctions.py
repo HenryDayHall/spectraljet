@@ -45,8 +45,8 @@ def test_kernels():
 def test_filter_design():
     # TODO why do we add an extra filter to the start??
     # first return value is the only one we use right now.
-    found, _, _ = CALEFunctions.filter_design(2., 1)
-    assert len(found) == 1 + 1
+    found = CALEFunctions.filter_design()
+    assert len(found) == 1
     assert hasattr(found[0], '__call__')
     # check it returns the same shape that went in
     output = found[0](np.array([1.]))

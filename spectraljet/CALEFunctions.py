@@ -133,8 +133,28 @@ def kernel_abspline3(x, alpha, beta, t1, t2):
 
     return r
 
-  
-def filter_design(l_max, N_scales, design_type='default', lp_factor=20,
+def filter_design():
+    """Return scaling function
+
+    Parameters
+    ----------
+    l_max : upper bound on spectrum
+    
+    Returns
+    -------
+    g : scaling and wavelets kernel
+   
+    """
+    # Define the regular function
+    def exp_neg_function(x):
+        return np.exp(-x)
+    g = []
+    g.append(exp_neg_function)
+        
+    return g
+
+
+def filter_design_old(l_max, N_scales, design_type='default', lp_factor=20,
                   a=2, b=2, t1=1, t2=2):
     """Return list of scaled wavelet kernels and derivatives.
     Note: see page 26 of the paper for the choice of values here.
@@ -182,7 +202,7 @@ def filter_design(l_max, N_scales, design_type='default', lp_factor=20,
 
 
 def cheby_coeff(g, m, N=None, arange=(-1,1)):
-    """ Compute Chebyshev coefficients of given function using numpy's chebfit.
+    """ Compute Chebyshev coefficients of given function.
 
     Parameters
     ----------
@@ -199,17 +219,16 @@ def cheby_coeff(g, m, N=None, arange=(-1,1)):
     if N is None:
         N = m+1
 
-    print(f"g = {g}")
-    print(f"m = {m}")
-    print(f"N = {N}")
-    print(f"arange = {arange}")
-
-    x = np.linspace(arange[0], arange[1], N)
-    y = g(x)
-    
-    c = np.polynomial.chebyshev.chebfit(x, y, m)
-
+    a1 = (arange[1] - arange[0]) / 2.0
+    a2 = (arange[1] + arange[0]) / 2.0
+    n = np.pi * (np.r_[1:N+1] - 0.5) / N
+    s = g(a1 * np.cos(n) + a2)
+    c = np.zeros(m+1)
+    for j in range(m+1):
+        c[j] = np.sum(s * np.cos(j * n)) * 2 / N
+    c[0] *= 0.5
     return c
+
 
 
 def preprocess_coefficients(c):
@@ -263,6 +282,7 @@ def cheby_op(wavelet_delta, laplacian, chebyshef_coefficients, arange):
         if N_coefficients > 1:
             results[j] += chebyshef_coefficients[j, 1] * fourier_transform_cur
 
+
     for k in range(2, N_coefficients):
         fourier_transform_new = (2/half_width)*(laplacian.dot(fourier_transform_cur)
                                                 - center*fourier_transform_cur) \
@@ -276,7 +296,7 @@ def cheby_op(wavelet_delta, laplacian, chebyshef_coefficients, arange):
         warnings.warn("The Laplacian matrix laplacian is all zeros.")
         results = [np.zeros_like(wavelet_delta) for _ in
                    range(chebyshef_coefficients.shape[0])]
-    
+   
     return results
 
 
@@ -332,10 +352,7 @@ def make_L(particle_rapidities, particle_phis, normalised=True, sigma = 0.15):
     """
 
     distances2 = FormJets.ca_distances2(particle_rapidities, particle_phis)
-    print(f"distances2 are {distances2}")
-    print(f"distances are {np.sqrt(distances2)}")
     affinities = FormJets.exp_affinity(distances2, sigma)
-    print(f"affinities are {affinities}")
     #affinities = np.exp(-distances2**2 / (2 * sigma**2))
     #np.fill_diagonal(affinities, 0.)
     diagonals = np.diag(np.sum(affinities, axis=0))
@@ -380,7 +397,7 @@ def wavelet_approx(L, l_max_val, L_idx,  N_scales = 1, m = 50):
     """
 
     # Design filters for transform
-    (g, gp, _) = filter_design(l_max_val, N_scales)
+    g = filter_design()
     arange = (0.0, l_max_val)
 
     # Chebyshev polynomial approximation
@@ -390,7 +407,6 @@ def wavelet_approx(L, l_max_val, L_idx,  N_scales = 1, m = 50):
     # Compute transform of delta at one vertex
     # Vertex to center wavelets to be shown
     d = L_idx.reshape(-1,1)
-    print(f"chebyshef_coefficients = {c}")
 
     # forward transform, using chebyshev approximation
     wp_all = cheby_op(d, L, c, arange)
