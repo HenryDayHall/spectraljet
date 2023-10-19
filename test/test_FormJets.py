@@ -239,38 +239,52 @@ def test_ratiokt_factor():
     tst.assert_allclose(out, np.array([[0.25, 4./9.]]))
 
 
-def test_exp_affinity():
-    """Calculating the affinity from a_ij = exp(-d_ij^exponent/sigma)
+class TestExpAffinity:
+    def function(self, *args, **kwargs):
+        """Calculating the affinity from a_ij = exp(-d_ij^exponent/sigma)
 
-    Parameters
-    -------
-    distances2 : 2d array of float
-        Distances squared between points.
-    sigma : float (optional)
-        Controls the bandwidth of the kernal.
-        (Default; 1)
-    exponant : float (optional)
-        power to raise the distance to.
-        (Default; 2)
-    fill_diagonal : bool
-        If true, fill the diagonal with 0.
-        
-    Returns
-    -------
-    aff : 2d array of float
-        Affinities between the points provided.
-    """
-    # shouldn't choke on empty input
-    out = FormJets.exp_affinity(np.zeros((0, 0)))
-    assert len(out) == 0
-    # or input lenght 1
-    out = FormJets.exp_affinity(np.zeros((1, 1)))
-    tst.assert_allclose(out, np.zeros((1, 1)))
-    # should give good ansers otherwise
-    out = FormJets.exp_affinity(np.array([[1, 2], [3, 0]]), 4., 3.,
-                                fill_diagonal=False)
-    tst.assert_allclose(out, np.array([[np.exp(-1/4), np.exp(-(2**1.5)/4)],
-                                       [np.exp(-(3**1.5)/4), 1.]]))
+        Parameters
+        -------
+        distances2 : 2d array of float
+            Distances squared between points.
+        sigma : float (optional)
+            Controls the bandwidth of the kernal.
+            (Default; 1)
+        exponant : float (optional)
+            power to raise the distance to.
+            (Default; 2)
+        fill_diagonal : bool
+            If true, fill the diagonal with 0.
+            
+        Returns
+        -------
+        aff : 2d array of float
+            Affinities between the points provided.
+        """
+        return FormJets.exp_affinity(*args, **kwargs)
+
+    def test_exp_affinity(self):
+        # shouldn't choke on empty input
+        out = self.function(np.zeros((0, 0)))
+        assert len(out) == 0
+        # or input lenght 1
+        out = self.function(np.zeros((1, 1)))
+        tst.assert_allclose(out, np.zeros((1, 1)))
+        # should give good ansers otherwise
+        out = self.function(np.array([[1, 2], [2, 1]])**2, 5.)
+        tst.assert_allclose(out, np.array([[0., np.exp(-4/5.)],
+                                           [np.exp(-4/5.), 0.]]))
+
+    def test_assymetric(self):
+        out = self.function(np.array([[1, 2], [3, 0]])**2, 5.)
+        tst.assert_allclose(out, np.array([[0., np.exp(-4/5.)],
+                                           [np.exp(-9/5.), 0.]]))
+
+    def test_exponent_fill_diagonal(self):
+        out = self.function(np.array([[1, 2], [3, 0]]), 4., 3.,
+                                    fill_diagonal=False)
+        tst.assert_allclose(out, np.array([[np.exp(-1/4), np.exp(-(2**1.5)/4)],
+                                           [np.exp(-(3**1.5)/4), 1.]]))
 
 
 def test_unnormed_laplacian():
@@ -325,29 +339,33 @@ def test_normalised_laplacian():
                                        [-2/np.sqrt(2), 1]]))
 
 
-def test_symmetric_laplacian():
-    """Construct a symmetric laplacian, L = D^-1/2(D-A)D^-1/2
+class TestSymmetricLaplacian:
+    def function(self, affinities):
+        """Construct a symmetric laplacian, L = D^-1/2(D-A)D^-1/2
 
-    Parameters
-    -------
-    affinities : 2d array of float
-        Square grid of affinities between points.
-        
-    Returns
-    -------
-    laplacian : 2d array of float
-        Laplacian of the graph.
-    """
-    # shouldn't choke on empty input
-    out = FormJets.symmetric_laplacian(np.zeros((0, 0)))
-    assert len(out) == 0
-    # or input lenght 1
-    out = FormJets.symmetric_laplacian(np.ones((1, 1)))
-    tst.assert_allclose(out, np.zeros((1, 1)))
-    # should give good ansers otherwise
-    out = FormJets.symmetric_laplacian(np.array([[1, 2], [2, 1]]))
-    tst.assert_allclose(out, np.array([[2/3, -2/3],
-                                       [-2/3, 2/3]]))
+        Parameters
+        -------
+        affinities : 2d array of float
+            Square grid of affinities between points.
+            
+        Returns
+        -------
+        laplacian : 2d array of float
+            Laplacian of the graph.
+        """
+        return FormJets.symmetric_laplacian(affinities)
+
+    def test_symmetric_laplacian(self):
+        # shouldn't choke on empty input
+        out = self.function(np.zeros((0, 0)))
+        assert len(out) == 0
+        # or input lenght 1
+        out = self.function(np.ones((1, 1)))
+        tst.assert_allclose(out, np.zeros((1, 1)))
+        # should give good ansers otherwise
+        out = self.function(np.array([[1, 2], [2, 1]]))
+        tst.assert_allclose(out, np.array([[2/3, -2/3],
+                                           [-2/3, 2/3]]))
 
 
 def test_embedding_space():

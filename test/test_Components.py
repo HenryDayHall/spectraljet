@@ -120,15 +120,19 @@ def test_confine_angle():
         tst.assert_allclose(Components.confine_angle(inp), out)
 
 
-def test_angular_distance():
-    inputs_a = np.array([0., 0., 0., 0., -1., -np.pi-0.1])
-    inputs_b = np.array([0., 1., -1., 2*np.pi, 1., np.pi+0.1])
-    expected = np.array([0., 1., 1., 0., 2., 0.2])
-    found = Components.angular_distance(inputs_a, inputs_b)
-    tst.assert_allclose(found, expected)
-    # check giving a single out
-    single_out = Components.angular_distance(0., 0.)
-    assert single_out == 0.
+class TestAngularDistance:
+    def function(self, a, b):
+        return Components.angular_distance(a, b)
+
+    def test_angular_distance(self):
+        inputs_a = np.array([0., 0., 0., 0., -1., -np.pi-0.1])
+        inputs_b = np.array([0., 1., -1., 2*np.pi, 1., np.pi+0.1])
+        expected = np.array([0., 1., 1., 0., 2., 0.2])
+        found = Components.angular_distance(inputs_a, inputs_b)
+        tst.assert_allclose(found, expected)
+        # check giving a single out
+        single_out = Components.angular_distance(0., 0.)
+        assert single_out == 0.
 
 
 def test_raw_to_angular_distance():

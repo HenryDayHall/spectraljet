@@ -23,6 +23,8 @@ jobs:
                   pip install -r requirements.txt
                   pip install pytest
                   pip install pytest-cov
+            - name: Get submodules
+              run: git submodule update --init --recursive
             - name: Run tests with pytest
               run: pytest --cov=spectraljet test/
             - name: Upload coverage reports to Codecov
