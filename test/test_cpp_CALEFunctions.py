@@ -1,11 +1,11 @@
 import numpy as np
 from numpy import testing as tst
 from spectraljet import Constants, FormJets, CALEFunctions
-from spectraljet.cpp_CALE import build
+from spectraljet import build_cpp
 
 build_dir = Constants.CALE_build_dir
-build.build(build_dir, force_rebuild = True)
-CALE = build.get_module(build_dir)
+build_cpp.build(build_dir, force_rebuild = True)
+CALE = build_cpp.get_module(build_dir)
 
 from . import test_CALEFunctions, test_Components, test_FormJets
 
