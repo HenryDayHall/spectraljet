@@ -1,3 +1,3 @@
 [submodule "spectraljet/cpp_CALE"]
 	path = spectraljet/cpp_CALE
-	url = git@github.com:HenryDayHall/cpp_CALE.git
+	url = https://github.com/HenryDayHall/cpp_CALE.git
