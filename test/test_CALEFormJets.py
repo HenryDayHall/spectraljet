@@ -1,3 +1,7 @@
+import sys
+from pathlib import Path
+path_root1 = Path(__file__).parents[1]
+sys.path.append(str(path_root1))
 import unittest
 import numpy as np
 import numpy.testing as tst

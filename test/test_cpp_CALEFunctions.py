@@ -1,3 +1,7 @@
+import sys
+from pathlib import Path
+path_root1 = Path(__file__).parents[1]
+sys.path.append(str(path_root1))
 import numpy as np
 from numpy import testing as tst
 from spectraljet import Constants, FormJets, CALEFunctions
