@@ -21,7 +21,6 @@ def test_set_scales():
     
 
 def test_kernels():
-    #TODO test abspline
     my_kernel = CALEFunctions.kernel(0., 'mh')
     # special case
     tst.assert_allclose(my_kernel, 0.)
