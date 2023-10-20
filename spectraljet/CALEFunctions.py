@@ -7,12 +7,171 @@ from matplotlib import colors
 import scipy
 import scipy.sparse.linalg as ssl
 from scipy.sparse import lil_matrix
-from scipy.optimize import fminbound
+from scipy.optimize import fminbound, curve_fit
 
 from . import FormJets
 
 
-# Deprecated, consider removing
+def pt_centers(energies, pxs, pys, pzs, pts, rapidities, phis, **kwargs):
+    """
+    Create 4 vectors based on pt distribution for seeding jets.
+    Must be IR safe.
+    Inspired by K-means clustering algorithm.
+    Each seed aims to represent sum(pts)/n_seeds
+    of the pt in the event.
+    First seed is always the thrust axis.
+    We then remove energy/momentum in an expanding cone
+    around the seed until the amount of pt represented by the
+    seed has been removed.
+    This is repeated for each seed.
+
+    Parameters
+    ----------
+    energies : numpy array of floats length N
+      energies of existing particles
+    pxs : numpy array of floats length N
+      pxs of existing particles
+    pys : numpy array of floats length N
+      pys of existing particles
+    pzs : numpy array of floats length N
+      pzs of existing particles
+    pts : numpy array of floats length N
+      pts of existing particles
+    rapidities : numpy array of floats length N
+      rapidities of existing particles
+    phis : numpy array of floats length N
+      phis of existing particles
+    **kwargs : dictionary of optional arguments
+      may include n_centers to set number of centers returned
+      default is 1
+      any other arguments are ignored
+
+    Returns
+    -------
+    seed_pxpypz : numpy array of floats (n_centers, 3)
+        px, py, pz coordinates of the centers
+    seed_ptrapphi : numpy array of floats (n_centers, 3)
+        pt, rapidity, phi coordinates of the centers
+    """
+    n_centers = kwargs.get('n_centers', 1)
+    seed_pxpypz = np.empty((n_centers, 3), dtype=float)
+    seed_pxpypz[0] = np.array([np.mean(pxs), np.mean(pys), np.mean(pzs)])
+    seed_pxpypz[0] /= np.norm(seed_pxpypz[0])
+    seed_ptrapphi = np.empty((n_centers, 3), dtype=float)
+    # calculate for the first seed
+    seed_ptrapphi[0, 0] = seed_pt
+    seed_ptrapphi[0, 2] = seed_phi
+    seed_ptrapphi[0, 1] = Components.ptpze_to_rapidity(seed_ptrapphi[0, 0], seed_pxpypz[0, 2], 1.)
+    if n_centers > 1:
+        energy_per_seed = np.sum(energies) / n_centers
+        energy_avaliable = np.ones(len(energies), dtype=float)
+        for i in range(1, n_centers):
+            # ca distances to seed
+            ca_distance = FormJets.ca_distances2(rapidities, phis,
+                                                 seed_ptrapphi[i-1, 1],
+                                                 seed_ptrapphi[i-1, 2])
+            energy_needed = energy_per_seed
+            for next_idx in np.argsort(ca_distance):
+                food = energy_avaliable[next_idx]*energies[next_idx]
+                percent_needed = min(1., energy_needed/food)
+                energy_avaliable[next_idx] -= percent_needed
+                energy_needed -= percent_needed*food
+                if energy_needed <= 0.:
+                    break
+            seed_pxpypz[i] = [np.mean(pxs*energy_avaliable),
+                              np.mean(pys*energy_avaliable),
+                              np.mean(pzs*energy_avaliable)]
+            seed_pxpypz[i] /= np.norm(seed_pxpypz[i])
+            seed_phi, seed_pt = Components.pxpy_to_phipt(seed_pxpypz[i, 0], seed_pxpypz[i, 1])
+            seed_ptrapphi[i, 0] = seed_pt
+            seed_ptrapphi[i, 2] = seed_phi
+            seed_ptrapphi[i, 1] = Components.ptpze_to_rapidity(seed_ptrapphi[i, 0], seed_pxpypz[i, 2], 1.)
+    return seed_pxpypz, seed_ptrapphi
+
+
+def random_centers(energies, pxs, pys, pzs, pts, rapidities, phis, **kwargs):
+    """
+    Create 4 normed vectors from random distributions.
+    Distribution is based on the a gaussian fitted to the
+    px, py, pz distribution, weighted by energy.
+
+    Parameters
+    ----------
+    energies : numpy array of floats length N
+      energies of existing particles
+    pxs : numpy array of floats length N
+      pxs of existing particles
+    pys : numpy array of floats length N
+      pys of existing particles
+    pzs : numpy array of floats length N
+      pzs of existing particles
+    pts : numpy array of floats length N
+      pts of existing particles
+    rapidities : numpy array of floats length N
+      rapidities of existing particles
+    phis : numpy array of floats length N
+      phis of existing particles
+    **kwargs : dictionary of optional arguments
+      may include n_centers to set number of centers returned
+      default is 1
+      any other arguments are ignored
+
+    Returns
+    -------
+    seed_pxpypz : numpy array of floats (n_centers, 3)
+        px, py, pz coordinates of the centers
+    seed_ptrapphi : numpy array of floats (n_centers, 3)
+        pt, rapidity, phi coordinates of the centers
+    """
+    seed_pxpypz = np.empty((n_centers, 3), dtype=float)
+    seed_ptrapphi = np.empty((n_centers, 3), dtype=float)
+    # assume x y and z are independent
+    seed_pxpypz[:, 0] = np.random.normal(np.mean(pxs), np.std(pxs), n_centers)
+    seed_pxpypz[:, 1] = np.random.normal(np.mean(pys), np.std(pys), n_centers)
+    seed_pxpypz[:, 2] = np.random.normal(np.mean(pzs), np.std(pzs), n_centers)
+    # normalize
+    seed_pxpypz /= np.linalg.norm(seed_pxpypz, axis=1)
+    seed_phi, seed_pts = Components.pxpy_to_phipt(seed_pxpypz[0, 0], seed_pxpypz[0, 1])
+    seed_ptrap_phi[:, 0] = seed_pts
+    seed_ptrapphi[:, 2] = seed_phi
+    seed_ptrapphi[:, 1] = Components.ptpze_to_rapidity(seed_pts, seed_pxpypz[:, 2], 1.)
+    return seed_pxpypz, seed_ptrapphi
+
+
+def pt_laplacian(pts, rapidities, phis, weight_exponent, sigma):
+    """
+    A laplacian matrix, where affinities have been scaled by pt,
+    and the laplacian itself is normalised by p_Ti*sum_j p_Tj dij
+
+    Parameters
+    ----------
+    pts : numpy array of floats length N
+      pts of existing particles
+    rapidities : numpy array of floats length N
+      rapidities of existing particles
+    phis : numpy array of floats length N
+      phis of existing particles
+    weight_exponent : float
+      Positive float which is a parameter of the weights
+    sigma : float
+      Positive float which is a parameter of the affinities
+
+    Returns
+    -------
+    laplacian : numpy array of floats (N, N)
+      Pt normalised laplacian matrix
+    """
+    assert weight_exponent >= 0., "weight_exponent must be positive for IR safety"
+    ca_distances2 = FormJets.ca_distances2(rapidities, phis)
+    pt_col = pts.reshape(-1, 1)
+    affinites = pts * pt_col * np.exp(-ca_distances2/(2*sigma**2))
+    np.fill_diagonal(affinities, 0.)
+    # if the exponent is 0, this is equivalent to normalisation = pts
+    normalisation = pts * np.sum((pt_col * ca_distances2)**(0.5*weight_exponent), axis=0)
+    laplacian = FormJets.normalised_laplacian(affinities, normalisation)
+    return laplacian
+
+
 def max_eigenvalue(L):
     """Upper-bound on the spectrum."""
     try:

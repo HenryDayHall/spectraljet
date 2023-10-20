@@ -75,16 +75,15 @@ class CALE(FormJets.Partitional):
 
 
 class CALEv2(FormJets.Partitional):
+    _cheby_coeffs = CALEFunctions.cheby_coeff(lambda x: np.exp(-x), 50)
     default_params = {'Sigma': .1,
                       'Cutoff': 0,
                       'WeightExponent': 0.,
-                      'SeedGenerator': 'PtCenter',
-                      'NRounds': 15}
+                      'SeedGenerator': 'PtCenter'}
     permited_values = {'Sigma': Constants.numeric_classes['pdn'],
                        'Cutoff': Constants.numeric_classes['rn'],
                        'WeightExponent': Constants.numeric_classes['pn'],
-                       'SeedGenerator': ['PtCenter', 'Random'],
-                       'NRounds': Constants.numeric_classes['nn']}
+                       'SeedGenerator': ['PtCenter', 'Random']}
 
     def _setup_clustering_functions(self):
         """
@@ -107,8 +106,10 @@ class CALEv2(FormJets.Partitional):
         energies, pxs, pys, pzs = self._seed_generator(
                 self.Avaliable_Energy,
                 self.Avaliable_Px, self.Avaliable_Py, self.Avaliable_Pz)
+        current_max_label = np.max(self.Label)
         for energy, px, py, pz in zip(energies, pxs, pys, pzs):
-            new_label = np.max(self.Label) + 1
+            new_label = current_max_label + 1
+            current_max_label += 1
             self._seed_labels.append(new_label)
             new_idx = self._next_free_row()
             # set all relationships to -1
@@ -137,61 +138,66 @@ class CALEv2(FormJets.Partitional):
         sorter = np.argsort(self.Label)
         seed_idxs = sorter[np.searchsorted(self.Label, self._seed_labels,
                                            sorter=sorter)]
-        # delete all the rows of the float and int arrays containing seeds
-        self._ints = np.delete(self._ints, seed_idxs, axis=0)
-        self._floats = np.delete(self._floats, seed_idxs, axis=0)
+        # no need to litrally delete the rows,
+        # just wipe the label out
+        self.Label[seed_idxs] = -1
         self._seed_labels.clear()
+        self._avaliable_idxs = [idx for idx in self._avaliable_idxs if idx not in seed_idxs]
+        self._avaliable_mask[seed_idxs] = False
 
     def allocate(self):
         """Sort the labels into exclusive jets"""
-
-        available_mask = np.full_like(self.Leaf_Label, True, dtype=bool)
+        # the assumption is that this function returns a list of
+        # constituent labels for each jet
+        # then another function is called to actually form the jets
+        # As it forms the list it needs to keep track of the avaliable
+        # particles itself, but aside from adding and removing seeds,
+        # there should eb no modification of the ints and floats
         jet_list = []
-
-        self.laplacien = CALEFunctions.pt_laplacian(
-                self.Avaliable_Pt,
-                self.Avaliable_Rapidity, self.Avaliable_Phi,
-                normalised=self.WeightExponent, sigma=self.Sigma)
-
+        unallocated_leaves = list(self.Leaf_Label)
         # Cannot have more jets than input particles.
-        max_jets = min(self.NRounds, len(self.Leaf_Rapidity))
-
-        l_idx = CALEFunctions.make_L_idx(self.Leaf_Rapidity, self.Leaf_Phi, self.Leaf_PT)
-
-        # Precompute L_idx sum and its sorted indices
-        seed_ordering = l_idx.sum(axis=0).argsort()
-        unclustered_idx_pointer = 0 
-
-        round_counter = 0
-
-        while unclustered_idx_pointer < len(seed_ordering) and round_counter < max_jets:
-            
-            next_unclustered_idx = seed_ordering[unclustered_idx_pointer]
-
-            # If the current seed is not available (already clustered), skip to the next one
-            if not available_mask[next_unclustered_idx]:
-                unclustered_idx_pointer += 1
-                continue
-            wavelet_mask = np.zeros_like(self.Leaf_Label, dtype=int)
-            wavelet_mask[next_unclustered_idx] = 1
-
-            _, wp_all = CALEFunctions.wavelet_approx(self.laplacien, 2, wavelet_mask)
-            wavelet_values = CALEFunctions.min_max_scale(np.array(wp_all[0])).flatten()
-            below_cutoff_indices = set(np.where(wavelet_values < self.Cutoff)[0])
-            available_particles = set(np.where(available_mask)[0])
-            labels = list(below_cutoff_indices & available_particles)
-
-            if labels:  # If we have some labels that match the criteria
-                jet_labels = self.Leaf_Label[labels]
-                jet_list.append(jet_labels)
-                available_mask[labels] = False
-
-            unclustered_idx_pointer += 1
-            round_counter += 1
-
-        # Store anything else as a 1-particle jet
-        jet_list += [self.Leaf_Label[i:i+1] for i in np.where(available_mask)[0]]
-
+        max_jets = min(len(self.Leaf_Rapidity))
+        while unallocated_leaves:
+            self._insert_new_seeds()
+            mask = np.isin(self.Label, unallocated_leaves + self._seed_labels)
+            # this will include the current seeds.
+            laplacien = CALEFunctions.pt_laplacian(
+                    self.Pt[mask], self.Rapidity[mask], self.Phi[mask],
+                    weight_exponent=self.WeightExponent, sigma=self.Sigma)
+            max_eigval = CALEFunctions.max_eigvalue(laplacien)
+            num_points = len(laplacien)
+            # going to keep a local avaliable mask for each batch of seeds
+            available_mask = np.full(num_points, True, dtype=bool)
+            seed_jets = []
+            found_content = False
+            for seed_label in self._seed_labels:
+                wavelet_delta = (self.Label[mask] == seed_label).astype(int)
+                # TODO, should the range be from 0 to max_eigval?
+                # do the eigenvalues actually go negative?
+                wavelets = CALEFunctions.cheby_op(wavelet_delta,
+                                                  laplacian, [self._cheby_coeffs],
+                                                  (0., max_eigval))
+                max_wavelet = np.max(wavelets)
+                min_wavelet = np.min(wavelets)
+                shifted_cutoff = (max_wavelet - min_wavelet)*(self.Cutoff + 1.)/2. + min_wavelet
+                below_cutoff = set(np.where(wavelets < shifted_cutoff)[0])
+                avaliable = set(np.where(available_mask)[0])
+                jet_content = list(below_cutoff & avaliable)
+                if jet_content:
+                    found_content = True
+                    labels = self.Label[mask][jet_content]
+                    jet_list.append(labels)
+                    available_mask[jet_content] = False
+                    for label in labels:
+                        unallocated_leaves.remove(label)
+            # this batch of seeds is done.
+            self._remove_seeds()
+            if not found_content:
+                # sometimes the seed leads to no jets
+                break  # for now, we just give up if this happens
+        if unallocated_leaves:
+            # Store anything else as a 1-particle jet
+            jet_list += [[label] for label in unallocated_leaves]
         return jet_list
 
 
