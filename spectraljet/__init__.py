@@ -9,5 +9,5 @@ from . import CALEFormJets
 from . import CALEFunctions
 from . import FastJetPython
 from .cpp_CALE import build as build_cpp
-# also, make EventWise avaliable at top level
+# also, make EventWise available at top level
 from .Components import EventWise

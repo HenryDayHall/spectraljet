@@ -24,7 +24,9 @@ max_tagangle = 0.8
 coordinate_order = ["Energy", "Px", "Py", "Pz", "PT", "Rapidity", "Phi"]
 
 # for checking if a parameter is valid
-numeric_classes = {'nn': 'natrual number', 'pdn': 'positive definite number', 'rn': 'real number'}
+numeric_classes = {'nn': 'natrual number',
+                   'pdn': 'positive definite number',
+                   'rn': 'real number'}
 
 def is_numeric_class(param, permitted):
     """

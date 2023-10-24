@@ -567,7 +567,7 @@ class Clustering:
                      "JoinDistance", "Size"]
     default_params = {}
     permited_values = {}
-    debug_attributes = ["avaliable_mask"]
+    debug_attributes = ["available_mask"]
 
     def __init__(self, *args, **kwargs):
         """
@@ -667,7 +667,7 @@ class Clustering:
 
     def setup_ints_floats(self, input_data):
         """ Create the _ints and _floats, along with
-        the _avaliable_mask and _avaliable_idxs
+        the _available_mask and _available_idxs
 
         Parameters
         ----------
@@ -680,8 +680,8 @@ class Clustering:
             start_ints, start_floats = self.read_ints_floats(input_data)
         self._ints, self._floats = \
             self.create_int_float_tables(start_ints, start_floats)
-        self._avaliable_mask = (self.Label != -1)*(self.Parent == -1)
-        self._avaliable_idxs = np.where(self._avaliable_mask)[0].tolist()
+        self._available_mask = (self.Label != -1)*(self.Parent == -1)
+        self._available_idxs = np.where(self._available_mask)[0].tolist()
 
     def read_ints_floats(self, eventWise):
         """ Read the data for clustering from a file.
@@ -752,18 +752,18 @@ class Clustering:
         Parameters
         ----------
         idxs_out : iterable of ints
-            the indices of points that are no longer avaliable.
+            the indices of points that are no longer available.
         idxs_in : iterable of ints (optional)
-            the indices of points that are now avaliable.
+            the indices of points that are now available.
         """
         for idx in idxs_out:
-            #assert self._avaliable_mask[idx]
-            self._avaliable_mask[idx] = False
-            self._avaliable_idxs.remove(idx)
+            #assert self._available_mask[idx]
+            self._available_mask[idx] = False
+            self._available_idxs.remove(idx)
         for idx in idxs_in:
-            #assert not self._avaliable_mask[idx]
-            self._avaliable_mask[idx] = True
-            bisect.insort(self._avaliable_idxs, idx)
+            #assert not self._available_mask[idx]
+            self._available_mask[idx] = True
+            bisect.insort(self._available_idxs, idx)
         
     def setup_hyperparams(self, dict_jet_params):
         """
@@ -827,7 +827,7 @@ class Clustering:
                     (self._ints[:, self._col_num["Label"]] != -1))
             return getattr(self, attr_name[5:])[mask]
         if attr_name.startswith("Available_"):
-            return getattr(self, attr_name[10:])[self._avaliable_idxs]
+            return getattr(self, attr_name[10:])[self._available_idxs]
         if attr_name in self.float_columns:
             col_num = self._col_num[attr_name]
             if attr_name == 'Phi':  # make sure it's -pi to pi
@@ -909,7 +909,7 @@ class Clustering:
         ax: matplotlib.pyplt.Axes (optional)
             the axes to plot on
         """
-        mask = self.debug_data["avaliable_mask"][step]
+        mask = self.debug_data["available_mask"][step]
         colours = self.make_leaf_colours()
         if ax is None:
             ax = plt.gca()
@@ -939,7 +939,7 @@ class Clustering:
 
 
 class Agglomerative(Clustering):
-    debug_attributes = ["avaliable_mask"]
+    debug_attributes = ["available_mask"]
 
     def create_int_float_tables(self, start_ints, start_floats):
         """ Format the data for clustering, allocating memory.
@@ -987,9 +987,9 @@ class Agglomerative(Clustering):
         return ints, floats
 
     @property
-    def _2d_avaliable_indices(self):
+    def _2d_available_indices(self):
         """
-        Using the _avaliable_idxs make indices for indexing
+        Using the _available_idxs make indices for indexing
         the corrisponding minor or a 2d matrix.
 
         Returns
@@ -997,8 +997,8 @@ class Agglomerative(Clustering):
         : tuple of arrays
             tuple that will index the matrix minor
         """
-        num_avail = len(self._avaliable_idxs)
-        avail = np.tile(self._avaliable_idxs, (num_avail, 1)).astype(int)
+        num_avail = len(self._available_idxs)
+        avail = np.tile(self._available_idxs, (num_avail, 1)).astype(int)
         return avail.T, avail
         
     def _reoptimise_preallocated(self):
@@ -1007,30 +1007,30 @@ class Agglomerative(Clustering):
         Memory limit has been reached, the preallocated arrays
         need to be rearanged to allow for removing objects which
         are no longer needed.
-        anything still in _avaliable_idxs will not be moved.
+        anything still in _available_idxs will not be moved.
         Also, remove anything in debug_data, becuase it will be
         invalidated.
         """
-        not_avaliable = np.where(~self._avaliable_mask)[0]
-        not_a_ints = self._ints[not_avaliable]
-        not_a_floats = self._floats[not_avaliable]
+        not_available = np.where(~self._available_mask)[0]
+        not_a_ints = self._ints[not_available]
+        not_a_floats = self._floats[not_available]
         # before they are erased, add them to the back of the arrays
         self._ints = np.concatenate((self._ints, not_a_ints))
         self._floats = np.concatenate((self._floats, not_a_floats))
         # now wipe those rows
-        self._ints[not_avaliable] = -1
-        self._floats[not_avaliable] = 0.
+        self._ints[not_available] = -1
+        self._floats[not_available] = 0.
         # avaliability remains as before
         # so any other
         # matrix can be ignored, assuming you only use
-        # avaliable row/cols
+        # available row/cols
         if hasattr(self, "debug_data"):
             # this is outdated, so scrap it
             self.debug_data = {name: [] for name in self.debug_data}
 
     def run(self):
         """Perform the clustering, without storing debug_data."""
-        if not self._avaliable_idxs:
+        if not self._available_idxs:
             return
         self.setup_internal()
         while True:
@@ -1044,7 +1044,7 @@ class Agglomerative(Clustering):
         self.setup_internal()
         self.debug_data = {name: [np.copy(getattr(self, '_' + name))]
                            for name in self.debug_attributes}
-        while self._avaliable_idxs:
+        while self._available_idxs:
             idx1, idx2 = self.chose_pair()
             if self.stopping_condition(idx1, idx2):
                 break
@@ -1054,7 +1054,7 @@ class Agglomerative(Clustering):
                     np.copy(getattr(self, '_' + name)))
 
     def get_historic_2d_mask(self, step):
-        """get a _2d_avaliable_indices mask for a previous step
+        """get a _2d_available_indices mask for a previous step
 
         only works if debug_data is stored
 
@@ -1069,7 +1069,7 @@ class Agglomerative(Clustering):
         : tuple of arrays
             tuple that will index the matrix minor
         """
-        mask = self.debug_data["avaliable_mask"][step]
+        mask = self.debug_data["available_mask"][step]
         idxs = np.where(mask)[0]
         num_avail = idxs.shape[0]
         avail = np.tile(idxs, (num_avail, 1))
@@ -1161,7 +1161,7 @@ class Agglomerative(Clustering):
         self._ints[idx_parent] = new_int_row
         self._floats[idx_parent] = new_float_row
         self._update_avalible([idx1, idx2], [idx_parent])
-        if np.sum(self._avaliable_mask) > 1:
+        if np.sum(self._available_mask) > 1:
             self.update_after_join(idx1, idx2, idx_parent)
 
     def chose_pair(self):
@@ -1174,13 +1174,13 @@ class Agglomerative(Clustering):
         column : int
             index of second of the pair of particles to next join.
         """
-        masked_distances2 = self._distances2[self._2d_avaliable_indices]
+        masked_distances2 = self._distances2[self._2d_available_indices]
         # this is the row and col in the masked array
         row, column = np.unravel_index(np.argmin(masked_distances2),
                                        masked_distances2.shape)
         # this is the row and col in the whole array
-        row = self._avaliable_idxs[row]
-        column = self._avaliable_idxs[column]
+        row = self._available_idxs[row]
+        column = self._available_idxs[column]
         return row, column
 
     def combine_ints_floats(self, idx1, idx2, distance2):
@@ -1373,7 +1373,7 @@ class GeneralisedKT(Agglomerative):
         # evenually take all nodes
         self._distances2 = np.empty((self._ints.shape[0], self._ints.shape[0]),
                                     dtype=float)
-        self._distances2[self._2d_avaliable_indices] = angular_distances2*kt_factor2
+        self._distances2[self._2d_available_indices] = angular_distances2*kt_factor2
         
     def stopping_condition(self, idx1, idx2):
         """ Will be called before taking another step.
@@ -1390,7 +1390,7 @@ class GeneralisedKT(Agglomerative):
         : bool
             True if the clustering should stop now, else False.
         """
-        return len(self._avaliable_idxs) < 2
+        return len(self._available_idxs) < 2
 
     def update_after_join(self, idx1, idx2, idx_parent):
         """Peform updates to internal data, after combining two particles.
@@ -1409,14 +1409,14 @@ class GeneralisedKT(Agglomerative):
         new_angular_distance2 = self._calc_distances2(
             self.Available_Rapidity, self.Available_Phi,
             new_rapidity, new_phi)
-        masked_idx_parent = self._avaliable_idxs.index(idx_parent)
+        masked_idx_parent = self._available_idxs.index(idx_parent)
         new_angular_distance2[masked_idx_parent] = self._DeltaR2
         new_pt = self.PT[[idx_parent]]
         new_kt_factor2 = self._calc_input_pt(
             self.ExpofPTInput, self.Available_PT, new_pt)**2
         new_distance2 = new_angular_distance2*new_kt_factor2
-        self._distances2[idx_parent, self._avaliable_mask] = new_distance2
-        self._distances2.T[idx_parent, self._avaliable_mask] = new_distance2
+        self._distances2[idx_parent, self._available_mask] = new_distance2
+        self._distances2.T[idx_parent, self._available_mask] = new_distance2
 
 
 class Spectral(Agglomerative):
@@ -1466,7 +1466,7 @@ class Spectral(Agglomerative):
                        'Beta': Constants.numeric_classes['rn'],
                        'ClipBeta': Constants.numeric_classes['pdn'],
                        }
-    debug_attributes = ["avaliable_mask", "laplacian", "eigenvalues",
+    debug_attributes = ["available_mask", "laplacian", "eigenvalues",
                         "embedding", "balenced_embedding"]
 
     def _setup_clustering_functions(self):
@@ -1598,14 +1598,14 @@ class Spectral(Agglomerative):
             self.ExpofPTInput, self.Available_PT)**2
         physical_distance2 = angular_distances2*input_kt_factor2
         self._physical_distance2 = np.empty(space_size, dtype=float)
-        self._physical_distance2[self._2d_avaliable_indices] = \
+        self._physical_distance2[self._2d_available_indices] = \
             physical_distance2
 
         # singularity factor
         self._singularity = np.empty(space_size, dtype=float)
         singularity = self._calc_singular(
             self.SingularitySuppression, angular_distances2, self.Available_PT)
-        self._singularity[self._2d_avaliable_indices] = singularity
+        self._singularity[self._2d_available_indices] = singularity
         # affinity
         self._affinity = np.empty((self._ints.shape[0], self._ints.shape[0]),
                                   dtype=float)
@@ -1614,14 +1614,14 @@ class Spectral(Agglomerative):
         affinity *= self._calc_affinity_pt(
             self.ExpofPTAffinity, self.Available_PT)**2
         affinity *= singularity
-        self._affinity[self._2d_avaliable_indices] = affinity
-        affinity = self._affinity[self._2d_avaliable_indices]
+        self._affinity[self._2d_available_indices] = affinity
+        affinity = self._affinity[self._2d_available_indices]
         # the CutoffKNN-1 is becuase the distance to self would be 0
         knn_mask = ([] if self.CutoffKNN is None
                     else ~knn(-affinity, self.CutoffKNN-1))
         affinity[knn_mask] = 0.
         # symmetric size, always symmetric in the first step
-        self._floats[self._avaliable_idxs, self._col_num["Size"]] =\
+        self._floats[self._available_idxs, self._col_num["Size"]] =\
             np.sum(affinity, axis=1)
 
     def _embedding_distance2(self, balenced, singularity=None, pt=None):
@@ -1633,7 +1633,7 @@ class Spectral(Agglomerative):
         raw_distances2 = self._calc_emb_distance2(balenced) * kt_factor2
         np.fill_diagonal(raw_distances2, np.inf)
         if singularity is None:
-            singularity = self._singularity[self._2d_avaliable_indices]
+            singularity = self._singularity[self._2d_available_indices]
         distances2 = singularity*raw_distances2
         return raw_distances2, distances2
 
@@ -1647,7 +1647,7 @@ class Spectral(Agglomerative):
         As such, this is called after each combination.
         """
         # laplacian
-        affinity = self._affinity[self._2d_avaliable_indices]
+        affinity = self._affinity[self._2d_available_indices]
         # the CutoffKNN-1 is becuase the distance to self would be 0
         knn_mask = ([] if self.CutoffKNN is None
                     else ~knn(-affinity, self.CutoffKNN-1))
@@ -1679,11 +1679,11 @@ class Spectral(Agglomerative):
         self._balenced_embedding = np.empty((self._ints.shape[0],
                                              balenced.shape[1]),
                                             dtype=float)
-        self._balenced_embedding[self._avaliable_idxs] = balenced
+        self._balenced_embedding[self._available_idxs] = balenced
 
         # distance in embedding space
-        self._raw_distances2[self._2d_avaliable_indices], \
-            self._distances2[self._2d_avaliable_indices] = \
+        self._raw_distances2[self._2d_available_indices], \
+            self._distances2[self._2d_available_indices] = \
             self._embedding_distance2(balenced)
 
     def stopping_condition(self, idx1, idx2):
@@ -1701,9 +1701,9 @@ class Spectral(Agglomerative):
         : bool
             True if the clustering should stop now, else False.
         """
-        if np.sum(self._avaliable_mask) < 2:
+        if np.sum(self._available_mask) < 2:
             return True
-        distances2 = self._raw_distances2[self._2d_avaliable_indices]
+        distances2 = self._raw_distances2[self._2d_available_indices]
         min_result = self._check_min_distance(distances2, self.MaxMinDist)
         mean_result = self._check_mean_distance(distances2, self.MaxMeanDist)
         return not (min_result * mean_result)
@@ -1726,23 +1726,23 @@ class Spectral(Agglomerative):
         new_angular_distance2 = self._calc_phys_distances2(
             self.Available_Rapidity, self.Available_Phi,
             new_rapidity, new_phi)
-        masked_idx_parent = self._avaliable_idxs.index(idx_parent)
+        masked_idx_parent = self._available_idxs.index(idx_parent)
         new_angular_distance2[masked_idx_parent] = 0.
         new_pt = self.PT[[idx_parent]]
         new_input_kt_factor2 = self._calc_input_pt(
             self.ExpofPTInput, self.Available_PT, new_pt)**2
         new_physical_distance2 = new_angular_distance2*new_input_kt_factor2
-        self._physical_distance2[idx_parent, self._avaliable_mask] = \
+        self._physical_distance2[idx_parent, self._available_mask] = \
             new_physical_distance2
-        self._physical_distance2.T[idx_parent, self._avaliable_mask] = \
+        self._physical_distance2.T[idx_parent, self._available_mask] = \
             new_physical_distance2
 
         # new singularity
         new_singularity = self._calc_singular(
             self.SingularitySuppression, new_angular_distance2, self.Available_PT,
             new_pt, masked_idx_parent)
-        self._singularity[idx_parent, self._avaliable_mask] = new_singularity
-        self._singularity.T[idx_parent, self._avaliable_mask] = new_singularity
+        self._singularity[idx_parent, self._available_mask] = new_singularity
+        self._singularity.T[idx_parent, self._available_mask] = new_singularity
 
         # new affinity
         new_affinity = exp_affinity(new_physical_distance2, sigma=self.Sigma,
@@ -1752,17 +1752,17 @@ class Spectral(Agglomerative):
         new_affinity_kt_factor = self._calc_affinity_pt(
             self.ExpofPTAffinity, self.Available_PT, new_pt)**2
         new_affinity *= new_affinity_kt_factor
-        self._affinity[idx_parent, self._avaliable_mask] = new_affinity
-        self._affinity.T[idx_parent, self._avaliable_mask] = new_affinity
+        self._affinity[idx_parent, self._available_mask] = new_affinity
+        self._affinity.T[idx_parent, self._available_mask] = new_affinity
 
         # new size
         join_singularity = self._singularity[idx1, idx2]
         # behavior when the join is not singular
-        self.Size[self._avaliable_mask] *= join_singularity
+        self.Size[self._available_mask] *= join_singularity
         # behavior when the join is singular
         summed_affinities = \
-            np.sum(self._affinity[self._2d_avaliable_indices], axis=0)
-        self.Size[self._avaliable_mask] += \
+            np.sum(self._affinity[self._2d_available_indices], axis=0)
+        self.Size[self._available_mask] += \
             (1 - join_singularity)*summed_affinities
 
         # everything else needs global calculation
@@ -1784,7 +1784,7 @@ class Spectral(Agglomerative):
         """As the distances will be modified each step this needs
         recalculating"""
         balenced = self.debug_data["balenced_embedding"][step]
-        mask = self.debug_data["avaliable_mask"][step]
+        mask = self.debug_data["available_mask"][step]
         mask_2d = self.get_historic_2d_mask(step)
         singularity = self._singularity[mask_2d]
         raw_distances2, distances2 = \
@@ -1830,7 +1830,7 @@ class Spectral(Agglomerative):
         ax.set_ylabel("Eigenvector element")
 
     def plt_balenced(self, step, ax=None):
-        mask = self.debug_data["avaliable_mask"][step]
+        mask = self.debug_data["available_mask"][step]
         balenced = self.debug_data["balenced_embedding"][step][mask]
         ax = self.setup_matrix_plt(ax)
         image = ax.imshow(balenced, origin='upper')
@@ -1842,7 +1842,7 @@ class Spectral(Agglomerative):
         embedding = self.debug_data["embedding"][step]
         ax.axis('equal')
         embedding_size = np.max(np.abs(embedding[:, [dim1, dim2]]))*1.5
-        mask = self.debug_data["avaliable_mask"][step]
+        mask = self.debug_data["available_mask"][step]
         colours = self.make_leaf_colours()
         if ax is None:
             ax = plt.gca()
@@ -1858,7 +1858,7 @@ class Spectral(Agglomerative):
         ax.set_ylim(-embedding_size, embedding_size)
 
     def plt_balenced_space(self, step, dim1=0, dim2=1, ax=None):
-        mask = self.debug_data["avaliable_mask"][step]
+        mask = self.debug_data["available_mask"][step]
         embedding = self.debug_data["balenced_embedding"][step][mask]
         colours = self.make_leaf_colours()
         if ax is None:
@@ -1874,7 +1874,7 @@ class Spectral(Agglomerative):
 
     def plt_dashboard(self, step):
         fig, ax_arr = plt.subplots(2, 4, figsize=[12, 6])
-        mask = self.debug_data["avaliable_mask"][step]
+        mask = self.debug_data["available_mask"][step]
         fig.suptitle(f"Step {step}, {np.sum(mask)} jets remain")
         self.plt_phys_space(step, ax=ax_arr[0, 0])
         self.plt_phys_distances(step, ax=ax_arr[1, 0])
@@ -1906,7 +1906,7 @@ class SpectralMean(Agglomerative):
 
         # distance in embedding space
         new_distances2 = self._calc_emb_distance2(
-                self._balenced_embedding[self._avaliable_idxs],
+                self._balenced_embedding[self._available_idxs],
                 new_balenced[np.newaxis])
         self._distances2[idx_parent, :] = new_distances2
         self._distances2[:, idx_parent] = new_distances2
@@ -2092,9 +2092,9 @@ class IterativeCone(Partitional):
 
     def _select_seed(self):
         """Pick a seed particle """
-        max_avaliable_idx = np.argmax(self.Available_PT)
-        if self.Available_PT[max_avaliable_idx] > self.SeedThreshold:
-            return max_avaliable_idx
+        max_available_idx = np.argmax(self.Available_PT)
+        if self.Available_PT[max_available_idx] > self.SeedThreshold:
+            return max_available_idx
         else:
             return -1
 
@@ -2116,15 +2116,15 @@ class IterativeCone(Partitional):
         # this will have to be calculated at least twice anyway
         cone_energy = np.inf
         while shift > 0.01:
-            cone_avaliable_idxs = \
+            cone_available_idxs = \
                 self._get_cone_content(cone_phi, cone_rapidity, cone_pt)
             new_cone_energy, cone_phi, cone_rapidity, cone_pt = \
-                self._get_cone_kinematics(cone_avaliable_idxs)
+                self._get_cone_kinematics(cone_available_idxs)
             shift = 2*(new_cone_energy - cone_energy) \
                 / (cone_energy + new_cone_energy)
             cone_energy = new_cone_energy
-        cone_labels = self.Available_Label[cone_avaliable_idxs]
-        return cone_labels, cone_avaliable_idxs
+        cone_labels = self.Available_Label[cone_available_idxs]
+        return cone_labels, cone_available_idxs
 
     def _get_cone_content(self, cone_phi, cone_rapidity, cone_pt):
         # N.B self.Phi would not work as it only gives end points
@@ -2136,16 +2136,16 @@ class IterativeCone(Partitional):
                                          self.Available_PT,
                                          np.array([[cone_pt]]))
         distances2 *= pt_factor2
-        cone_avaliable_idxs = \
+        cone_available_idxs = \
             np.where(ak.flatten(distances2) < self.deltaR2)[0]
-        return cone_avaliable_idxs
+        return cone_available_idxs
 
-    def _get_cone_kinematics(self, cone_avaliable_idxs):
-        if len(cone_avaliable_idxs) == 0:
+    def _get_cone_kinematics(self, cone_available_idxs):
+        if len(cone_available_idxs) == 0:
             return 0., 0., 0., 0.
         column_nums = [self._col_num[name] for name in
                        ["Energy", "Px", "Py", "Pz"]]
-        columns = self._floats[self._avaliable_idxs][:, column_nums]
+        columns = self._floats[self._available_idxs][:, column_nums]
         e, px, py, pz = np.sum(columns, axis=0)
         phi, pt = Components.pxpy_to_phipt(px, py)
         rapidity = Components.ptpze_to_rapidity(pt, pz, e)
@@ -2153,10 +2153,10 @@ class IterativeCone(Partitional):
 
     def allocate(self):
         jet_list = []
-        while self._avaliable_idxs:
-            cone_labels, cone_avaliable_idxs = self._find_jet()
+        while self._available_idxs:
+            cone_labels, cone_available_idxs = self._find_jet()
             jet_list.append(cone_labels)
-            self._update_avalible(self._avaliable_idxs[cone_avaliable_idxs])
+            self._update_avalible(self._available_idxs[cone_available_idxs])
         return jet_list
 
 

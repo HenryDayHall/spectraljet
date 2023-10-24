@@ -9,7 +9,33 @@ import scipy.sparse.linalg as ssl
 from scipy.sparse import lil_matrix
 from scipy.optimize import fminbound, curve_fit
 
-from . import FormJets
+from . import FormJets, Components
+
+def _no_centers():
+    """ Helper function for when no centers are requested"""
+    seed_pxpypz = np.empty((0, 3), dtype=float)
+    seed_ptrapphi = np.empty((0, 3), dtype=float)
+    return seed_pxpypz, seed_ptrapphi
+
+
+def _pad_centers(seed_pxpypz, seed_ptrapphi, n_centers):
+    """ Helper function for when not enough centers can be created"""
+    if n_centers > len(seed_pxpypz):
+        needed = n_centers - len(seed_pxpypz)
+        # fill out with random centers
+        n_seeds = len(seed_pxpypz)
+        energies = np.ones(n_seeds)
+        pxs = seed_pxpypz[:, 0]
+        pys = seed_pxpypz[:, 1]
+        pzs = seed_pxpypz[:, 2]
+        pts = seed_ptrapphi[:, 0]
+        rapidities = seed_ptrapphi[:, 1]
+        phis = seed_ptrapphi[:, 2]
+        rand_pxpypz, rand_ptrapphi = random_centers(energies, pxs, pys, pzs, pts,
+                                                    rapidities, phis, n_centers=needed)
+        seed_pxpypz = np.concatenate((seed_pxpypz, rand_pxpypz))
+        seed_ptrapphi = np.concatenate((seed_ptrapphi, rand_ptrapphi))
+    return seed_pxpypz, seed_ptrapphi
 
 
 def pt_centers(energies, pxs, pys, pzs, pts, rapidities, phis, **kwargs):
@@ -41,9 +67,10 @@ def pt_centers(energies, pxs, pys, pzs, pts, rapidities, phis, **kwargs):
       rapidities of existing particles
     phis : numpy array of floats length N
       phis of existing particles
+    n_centers : int (optional)
+        number of centers to return
+        default is 1
     **kwargs : dictionary of optional arguments
-      may include n_centers to set number of centers returned
-      default is 1
       any other arguments are ignored
 
     Returns
@@ -54,38 +81,43 @@ def pt_centers(energies, pxs, pys, pzs, pts, rapidities, phis, **kwargs):
         pt, rapidity, phi coordinates of the centers
     """
     n_centers = kwargs.get('n_centers', 1)
+    if n_centers == 0:
+        return _no_centers()
     seed_pxpypz = np.empty((n_centers, 3), dtype=float)
     seed_pxpypz[0] = np.array([np.mean(pxs), np.mean(pys), np.mean(pzs)])
-    seed_pxpypz[0] /= np.norm(seed_pxpypz[0])
+    seed_pxpypz[0] /= np.linalg.norm(seed_pxpypz[0])
     seed_ptrapphi = np.empty((n_centers, 3), dtype=float)
     # calculate for the first seed
+    seed_phi, seed_pt = Components.pxpy_to_phipt(seed_pxpypz[0, 0], seed_pxpypz[0, 1])
     seed_ptrapphi[0, 0] = seed_pt
     seed_ptrapphi[0, 2] = seed_phi
     seed_ptrapphi[0, 1] = Components.ptpze_to_rapidity(seed_ptrapphi[0, 0], seed_pxpypz[0, 2], 1.)
-    if n_centers > 1:
-        energy_per_seed = np.sum(energies) / n_centers
-        energy_avaliable = np.ones(len(energies), dtype=float)
-        for i in range(1, n_centers):
-            # ca distances to seed
-            ca_distance = FormJets.ca_distances2(rapidities, phis,
-                                                 seed_ptrapphi[i-1, 1],
-                                                 seed_ptrapphi[i-1, 2])
-            energy_needed = energy_per_seed
-            for next_idx in np.argsort(ca_distance):
-                food = energy_avaliable[next_idx]*energies[next_idx]
-                percent_needed = min(1., energy_needed/food)
-                energy_avaliable[next_idx] -= percent_needed
-                energy_needed -= percent_needed*food
-                if energy_needed <= 0.:
-                    break
-            seed_pxpypz[i] = [np.mean(pxs*energy_avaliable),
-                              np.mean(pys*energy_avaliable),
-                              np.mean(pzs*energy_avaliable)]
-            seed_pxpypz[i] /= np.norm(seed_pxpypz[i])
-            seed_phi, seed_pt = Components.pxpy_to_phipt(seed_pxpypz[i, 0], seed_pxpypz[i, 1])
-            seed_ptrapphi[i, 0] = seed_pt
-            seed_ptrapphi[i, 2] = seed_phi
-            seed_ptrapphi[i, 1] = Components.ptpze_to_rapidity(seed_ptrapphi[i, 0], seed_pxpypz[i, 2], 1.)
+    energy_per_seed = np.sum(energies) / n_centers
+    energy_available = np.ones(len(energies), dtype=float)
+    for i in range(1, n_centers):
+        if np.sum(energy_available) <= 0.:
+            break
+        # ca distances to seed
+        ca_distance = FormJets.ca_distances2(rapidities, phis,
+                                             seed_ptrapphi[i-1, 1],
+                                             seed_ptrapphi[i-1, 2])
+        energy_needed = energy_per_seed
+        for next_idx in np.argsort(ca_distance):
+            food = energy_available[next_idx]*energies[next_idx]
+            percent_needed = min(1., energy_needed/food)
+            energy_available[next_idx] -= percent_needed
+            energy_needed -= percent_needed*food
+            if energy_needed <= 0.:
+                break
+        seed_pxpypz[i] = [np.mean(pxs*energy_available),
+                          np.mean(pys*energy_available),
+                          np.mean(pzs*energy_available)]
+        seed_pxpypz[i] /= np.linalg.norm(seed_pxpypz[i])
+        seed_phi, seed_pt = Components.pxpy_to_phipt(seed_pxpypz[i, 0], seed_pxpypz[i, 1])
+        seed_ptrapphi[i, 0] = seed_pt
+        seed_ptrapphi[i, 2] = seed_phi
+        seed_ptrapphi[i, 1] = Components.ptpze_to_rapidity(seed_ptrapphi[i, 0], seed_pxpypz[i, 2], 1.)
+    seed_pxpypz, seed_ptrapphi = _pad_centers(seed_pxpypz, seed_ptrapphi, n_centers)
     return seed_pxpypz, seed_ptrapphi
 
 
@@ -111,9 +143,10 @@ def random_centers(energies, pxs, pys, pzs, pts, rapidities, phis, **kwargs):
       rapidities of existing particles
     phis : numpy array of floats length N
       phis of existing particles
+    n_centers : int (optional)
+        number of centers to return
+        default is 1
     **kwargs : dictionary of optional arguments
-      may include n_centers to set number of centers returned
-      default is 1
       any other arguments are ignored
 
     Returns
@@ -123,18 +156,68 @@ def random_centers(energies, pxs, pys, pzs, pts, rapidities, phis, **kwargs):
     seed_ptrapphi : numpy array of floats (n_centers, 3)
         pt, rapidity, phi coordinates of the centers
     """
+    n_centers = kwargs.get('n_centers', 1)
+    if n_centers == 0:
+        return _no_centers()
     seed_pxpypz = np.empty((n_centers, 3), dtype=float)
     seed_ptrapphi = np.empty((n_centers, 3), dtype=float)
     # assume x y and z are independent
-    seed_pxpypz[:, 0] = np.random.normal(np.mean(pxs), np.std(pxs), n_centers)
-    seed_pxpypz[:, 1] = np.random.normal(np.mean(pys), np.std(pys), n_centers)
-    seed_pxpypz[:, 2] = np.random.normal(np.mean(pzs), np.std(pzs), n_centers)
+    if len(pxs) == 0:
+        seed_pxpypz = np.random.normal(0., 1., (n_centers, 3))
+    else:
+        seed_pxpypz[:, 0] = np.random.normal(np.mean(pxs), np.std(pxs), n_centers)
+        seed_pxpypz[:, 1] = np.random.normal(np.mean(pys), np.std(pys), n_centers)
+        seed_pxpypz[:, 2] = np.random.normal(np.mean(pzs), np.std(pzs), n_centers)
     # normalize
-    seed_pxpypz /= np.linalg.norm(seed_pxpypz, axis=1)
-    seed_phi, seed_pts = Components.pxpy_to_phipt(seed_pxpypz[0, 0], seed_pxpypz[0, 1])
-    seed_ptrap_phi[:, 0] = seed_pts
+    seed_pxpypz /= np.linalg.norm(seed_pxpypz, axis=1).reshape((-1, 1))
+    seed_phi, seed_pts = Components.pxpy_to_phipt(seed_pxpypz[:, 0], seed_pxpypz[:, 1])
+    seed_ptrapphi[:, 0] = seed_pts
     seed_ptrapphi[:, 2] = seed_phi
-    seed_ptrapphi[:, 1] = Components.ptpze_to_rapidity(seed_pts, seed_pxpypz[:, 2], 1.)
+    seed_energies = np.ones(n_centers, dtype=float)
+    seed_ptrapphi[:, 1] = Components.ptpze_to_rapidity(seed_pts, seed_pxpypz[:, 2], seed_energies)
+    return seed_pxpypz, seed_ptrapphi
+
+
+def unsafe_centers(energies, pxs, pys, pzs, pts, rapidities, phis, **kwargs):
+    """
+    Return the location of the highest pT particles.
+
+    Parameters
+    ----------
+    energies : numpy array of floats length N
+      energies of existing particles
+    pxs : numpy array of floats length N
+      pxs of existing particles
+    pys : numpy array of floats length N
+      pys of existing particles
+    pzs : numpy array of floats length N
+      pzs of existing particles
+    pts : numpy array of floats length N
+      pts of existing particles
+    rapidities : numpy array of floats length N
+      rapidities of existing particles
+    phis : numpy array of floats length N
+      phis of existing particles
+    n_centers : int (optional)
+        number of centers to return
+        default is 1
+    **kwargs : dictionary of optional arguments
+      any other arguments are ignored
+
+    Returns
+    -------
+    seed_pxpypz : numpy array of floats (n_centers, 3)
+        px, py, pz coordinates of the centers
+    seed_ptrapphi : numpy array of floats (n_centers, 3)
+        pt, rapidity, phi coordinates of the centers
+    """
+    n_centers = kwargs.get('n_centers', 1)
+    if n_centers == 0:
+        return _no_centers()
+    idxs = np.argsort(pts)[:-n_centers-1:-1]
+    seed_pxpypz = np.vstack((pxs[idxs], pys[idxs], pzs[idxs])).T
+    seed_ptrapphi = np.vstack((pts[idxs], rapidities[idxs], phis[idxs])).T
+    seed_pxpypz, seed_ptrapphi = _pad_centers(seed_pxpypz, seed_ptrapphi, n_centers)
     return seed_pxpypz, seed_ptrapphi
 
 
@@ -164,7 +247,7 @@ def pt_laplacian(pts, rapidities, phis, weight_exponent, sigma):
     assert weight_exponent >= 0., "weight_exponent must be positive for IR safety"
     ca_distances2 = FormJets.ca_distances2(rapidities, phis)
     pt_col = pts.reshape(-1, 1)
-    affinites = pts * pt_col * np.exp(-ca_distances2/(2*sigma**2))
+    affinities = pts * pt_col * np.exp(-ca_distances2/(2*sigma**2))
     np.fill_diagonal(affinities, 0.)
     # if the exponent is 0, this is equivalent to normalisation = pts
     normalisation = pts * np.sum((pt_col * ca_distances2)**(0.5*weight_exponent), axis=0)

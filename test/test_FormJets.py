@@ -502,7 +502,7 @@ def test_embedding_angular2():
 
 def test_Agglomerative_setup_ints_floats():
     """ Create the _ints and _floats, along with 
-    the _avaliable_mask and _avaliable_idxs
+    the _available_mask and _available_idxs
 
     Parameters
     ----------
@@ -516,9 +516,9 @@ def test_Agglomerative_setup_ints_floats():
         set_JetInputs(ew, floats)
         agg = FormJets.GeneralisedKT(ew)
         # should make 3 rows so there is a row for the 
-        tst.assert_allclose(agg._avaliable_mask, [True, True, False])
+        tst.assert_allclose(agg._available_mask, [True, True, False])
         tst.assert_allclose(agg.PT[:2], np.ones(2))
-        assert {0, 1} == set(agg._avaliable_idxs)
+        assert {0, 1} == set(agg._available_idxs)
         assert set(agg.Label) == {-1, 0, 1}
         # should be able to achive the same by passing ints and floats
         ints = -np.ones_like(agg._ints)
@@ -528,9 +528,9 @@ def test_Agglomerative_setup_ints_floats():
         tst.assert_allclose(agg2._floats, agg._floats)
 
 
-def test_Agglomerative_2d_avaliable_indices():
+def test_Agglomerative_2d_available_indices():
     """
-    Using the _avaliable_idxs make indices for indexing
+    Using the _available_idxs make indices for indexing
     the corrisponding minor or a 2d matrix.
 
     Returns
@@ -543,7 +543,7 @@ def test_Agglomerative_2d_avaliable_indices():
     floats = np.zeros((4, len(FormJets.Agglomerative.float_columns)))
     agg = FormJets.GeneralisedKT((ints, floats))
     agg._update_avalible([1, 3])
-    mask = agg._2d_avaliable_indices
+    mask = agg._2d_available_indices
     test = np.array([[0, 1, 2, 3],
                      [4, 5, 6, 7],
                      [8, 9, 10, 11],
@@ -557,7 +557,7 @@ def test_Agglomerative_reoptimise_preallocated():
     Memory limit has been reached, the preallocated arrays
     need to be rearanged to allow for removing objects which
     are no longer needed.
-    anything still in _avaliable_idxs will not be moved.
+    anything still in _available_idxs will not be moved.
     Also, remove anything in debug_data, becuase it will be
     invalidated.
     """
@@ -578,7 +578,7 @@ def test_Agglomerative_reoptimise_preallocated():
 
 
 def test_Agglomerative_get_historic_2d_mask():
-    """get a _2d_avaliable_indices mask for a previous step
+    """get a _2d_available_indices mask for a previous step
 
     only works if debug_data is stored
 
@@ -615,9 +615,9 @@ def test_Agglomerative_update_avalible():
     Parameters
     ----------
     idxs_out : iterable of ints
-        the indices of points that are no longer avaliable.
+        the indices of points that are no longer available.
     idxs_in : iterable of ints (optional)
-        the indices of points that are now avaliable.
+        the indices of points that are now available.
     """
     floats = SimpleClusterSamples.two_close["floats"]
     floats = np.concatenate((floats, floats))
@@ -625,14 +625,14 @@ def test_Agglomerative_update_avalible():
     ints[:, 0] = [0, 1, 2, 3]
     agg = FormJets.GeneralisedKT((ints, floats), memory_cap=10)
     agg._update_avalible([0])
-    assert set(agg._avaliable_idxs) == {1, 2, 3}
+    assert set(agg._available_idxs) == {1, 2, 3}
     expected = np.zeros(10, dtype=bool)
     expected[[1, 2, 3]] = True
-    tst.assert_allclose(expected, agg._avaliable_mask)
+    tst.assert_allclose(expected, agg._available_mask)
     agg._update_avalible([], [5, 6])
-    assert set(agg._avaliable_idxs) == {1, 2, 3, 5, 6}
+    assert set(agg._available_idxs) == {1, 2, 3, 5, 6}
     expected[[5, 6]] = True
-    tst.assert_allclose(expected, agg._avaliable_mask)
+    tst.assert_allclose(expected, agg._available_mask)
 
 
 def test_Agglomerative_next_free_row():
@@ -1001,7 +1001,7 @@ def test_Spectral_size():
     spect = FormJets.Spectral((ints, floats), memory_cap=10,
                               dict_jet_params=params)
     spect.setup_internal()
-    expected_inital_size = spect._affinity[spect._2d_avaliable_indices][0, 1]
+    expected_inital_size = spect._affinity[spect._2d_available_indices][0, 1]
     tst.assert_allclose(spect.Available_Size, expected_inital_size)
     new_ints, new_floats = spect.combine_ints_floats(0, 1, 0.)
     tst.assert_allclose(new_floats[spect._col_num["Size"]],

@@ -9,7 +9,6 @@ from spectraljet import Constants
 import numpy as np
 import pytest
 
-numeric_classes = {'nn': 'natrual number', 'pdn': 'positive definite number', 'rn': 'real number'}
 def test_is_numeric_class():
     # start with natrual numbers
     num_type = 'natrual number'

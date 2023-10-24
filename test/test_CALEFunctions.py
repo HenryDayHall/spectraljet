@@ -8,6 +8,131 @@ import numpy.testing as tst
 from spectraljet import CALEFunctions
 
 
+
+class TestRandomCenters(unittest.TestCase):
+    def make_args(self, energies, pxs, pys, pzs):
+        energies = np.array(energies)
+        pxs = np.array(pxs)
+        pys = np.array(pys)
+        pzs = np.array(pzs)
+        phis, pts = CALEFunctions.Components.pxpy_to_phipt(pxs, pys)
+        rapidities = CALEFunctions.Components.ptpze_to_rapidity(pts, pzs, energies)
+        args = [energies, pxs, pys, pzs, pts, rapidities, phis]
+        return args
+
+    def function(self, energies, pxs, pys, pzs, **kwargs):
+        args = self.make_args(energies, pxs, pys, pzs)
+        return CALEFunctions.random_centers(*args, **kwargs)
+
+    def length_check(self, energies, pxs, pys, pzs, n_centers):
+        inputs = [energies, pxs, pys, pzs]
+        seed_pxpypz, seed_ptrapphi = self.function(*inputs, n_centers=n_centers)
+        assert seed_pxpypz.shape == (n_centers, 3)
+        assert seed_ptrapphi.shape == (n_centers, 3)
+        return seed_pxpypz, seed_ptrapphi
+
+    def test_empty(self):
+        self.length_check([], [], [], [], 0)
+        self.length_check([], [], [], [], 1)
+        self.length_check([], [], [], [], 2)
+
+    one_particle = [np.array([20.]),
+                    np.array([1.]),
+                    np.array([0.]),
+                    np.array([0.])]
+
+    def test_one_particle(self):
+        self.length_check(*self.one_particle, 0)
+        self.length_check(*self.one_particle, 1)
+        self.length_check(*self.one_particle, 2)
+
+    two_clusters = [np.array([20., 15., 20., 15.]),
+                    np.array([4., 3., 0., 0.]),
+                    np.array([0., 0., 2., 1.]),
+                    np.array([0., 0., 0., 0.])]
+
+    def test_two_clusters(self):
+        self.length_check(*self.two_clusters, 0)
+        self.length_check(*self.two_clusters, 1)
+        self.length_check(*self.two_clusters, 2)
+
+
+class TestUnsafeCenters(TestRandomCenters):
+    def function(self, energies, pxs, pys, pzs, **kwargs):
+        args = self.make_args(energies, pxs, pys, pzs)
+        return CALEFunctions.unsafe_centers(*args, **kwargs)
+
+    def test_one_particle(self):
+        # no comparion to make for length 0
+        self.length_check(*self.one_particle, 0)
+        # expect length 1 to be the particle
+        seed_pxpypz, seed_ptrapphi = self.length_check(*self.one_particle, 1)
+        expected_pxpypz = np.array([[1., 0., 0.]])
+        tst.assert_allclose(seed_pxpypz, expected_pxpypz)
+        expected_ptrapphi = np.array([[1., 0., 0.]])
+        tst.assert_allclose(seed_ptrapphi, expected_ptrapphi)
+        # for length 2, expect the first particle to be the particle with highest pT
+        seed_pxpypz, seed_ptrapphi = self.length_check(*self.one_particle, 2)
+        tst.assert_allclose(seed_pxpypz[0], expected_pxpypz[0])
+        tst.assert_allclose(seed_ptrapphi[0], expected_ptrapphi[0])
+
+    def test_two_clusters(self):
+        # no comparion to make for length 0
+        self.length_check(*self.two_clusters, 0)
+        # expect length 1 to be the particle with highest pt
+        seed_pxpypz, seed_ptrapphi = self.length_check(*self.two_clusters, 1)
+        expected_pxpypz = np.array([[4., 0., 0.]])
+        tst.assert_allclose(seed_pxpypz, expected_pxpypz)
+        expected_ptrapphi = np.array([[4., 0., 0.]])
+        tst.assert_allclose(seed_ptrapphi, expected_ptrapphi)
+        # expect length 2 to be the particles with highest pt
+        seed_pxpypz, seed_ptrapphi = self.length_check(*self.two_clusters, 2)
+        expected_pxpypz = np.array([[4., 0., 0.], [3., 0., 0.]])
+        tst.assert_allclose(seed_pxpypz, expected_pxpypz)
+        expected_ptrapphi = np.array([[4., 0., 0.], [3., 0., 0.]])
+        tst.assert_allclose(seed_ptrapphi, expected_ptrapphi)
+
+
+class TestPtCenters(TestRandomCenters):
+    def function(self, energies, pxs, pys, pzs, **kwargs):
+        args = self.make_args(energies, pxs, pys, pzs)
+        return CALEFunctions.pt_centers(*args, **kwargs)
+
+    def test_one_particle(self):
+        # no comparion to make for length 0
+        self.length_check(*self.one_particle, 0)
+        # expect length 1 to be the particle
+        seed_pxpypz, seed_ptrapphi = self.length_check(*self.one_particle, 1)
+        expected_pxpypz = np.array([[1., 0., 0.]])
+        tst.assert_allclose(seed_pxpypz, expected_pxpypz)
+        expected_ptrapphi = np.array([[1., 0., 0.]])
+        tst.assert_allclose(seed_ptrapphi, expected_ptrapphi)
+        # for length 2, we expect the first result to be the particle
+        seed_pxpypz, seed_ptrapphi = self.length_check(*self.one_particle, 2)
+        tst.assert_allclose(seed_pxpypz[0], expected_pxpypz[0])
+        tst.assert_allclose(seed_ptrapphi[0], expected_ptrapphi[0])
+
+    def test_two_clusters(self):
+        # no comparion to make for length 0
+        self.length_check(*self.two_clusters, 0)
+        # expect length 1 to be the center of momentum
+        seed_pxpypz, seed_ptrapphi = self.length_check(*self.two_clusters, 1)
+        pt = np.sqrt(1.75**2 + 0.75**2)
+        expected_pxpypz = np.array([[1.75, 0.75, 0.]])/pt
+        tst.assert_allclose(seed_pxpypz, expected_pxpypz)
+        expected_ptrapphi = np.array([[1., 0., np.arccos(1.75/pt)]])
+        tst.assert_allclose(seed_ptrapphi, expected_ptrapphi)
+        # expect length 2 to be the center of momentum, then the second cluster
+        seed_pxpypz, seed_ptrapphi = self.length_check(*self.two_clusters, 2)
+        expected_pxpypz = np.array([expected_pxpypz[0], [0., 1., 0.]])
+        tst.assert_allclose(seed_pxpypz, expected_pxpypz)
+        expected_ptrapphi = np.array([expected_ptrapphi[0], [1., 0., np.pi/2]])
+        tst.assert_allclose(seed_ptrapphi, expected_ptrapphi)
+
+
+def test_pt_laplacian():
+    pass  # TODO
+
 def test_set_scales():
     found = CALEFunctions.set_scales(1., 2., 0)
     assert len(found) == 0
@@ -22,7 +147,6 @@ def test_set_scales():
     tst.assert_allclose(found[[0,-1]], [2., 1.])
     assert found[1] > 1. and found[1] < 2.
 
-    
 
 def test_kernels():
     my_kernel = CALEFunctions.kernel(0., 'mh')
