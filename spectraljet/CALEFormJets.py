@@ -309,8 +309,6 @@ def plt_clustering(cluster_algo, seed_values, made_jet, jet_list, stalk_plot_var
         plot_points_on_stalks(ax2, colours[i], *args)
 
 
-    
-
 def make_axes():
     fig = plt.figure(figsize=(12, 6))
     ax1 = fig.add_subplot(121)

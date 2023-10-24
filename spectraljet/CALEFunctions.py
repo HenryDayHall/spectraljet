@@ -235,7 +235,7 @@ def pt_laplacian(pts, rapidities, phis, weight_exponent, sigma):
     phis : numpy array of floats length N
       phis of existing particles
     weight_exponent : float
-      Positive float which is a parameter of the weights
+      An exponent on the distance factor of other weights.
     sigma : float
       Positive float which is a parameter of the affinities
 
@@ -244,13 +244,12 @@ def pt_laplacian(pts, rapidities, phis, weight_exponent, sigma):
     laplacian : numpy array of floats (N, N)
       Pt normalised laplacian matrix
     """
-    assert weight_exponent >= 0., "weight_exponent must be positive for IR safety"
     ca_distances2 = FormJets.ca_distances2(rapidities, phis)
     pt_col = pts.reshape(-1, 1)
     affinities = pts * pt_col * np.exp(-ca_distances2/(2*sigma**2))
     np.fill_diagonal(affinities, 0.)
     # if the exponent is 0, this is equivalent to normalisation = pts
-    normalisation = pts * np.sum((pt_col * ca_distances2)**(0.5*weight_exponent), axis=0)
+    normalisation = pts * np.sum(pt_col * ca_distances2**0.5, axis=0)**weight_exponent
     laplacian = FormJets.normalised_laplacian(affinities, normalisation)
     return laplacian
 

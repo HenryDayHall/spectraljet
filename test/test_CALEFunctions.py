@@ -131,7 +131,59 @@ class TestPtCenters(TestRandomCenters):
 
 
 def test_pt_laplacian():
-    pass  # TODO
+    # an empty event shouldn't make the funciton choke
+    found = CALEFunctions.pt_laplacian(np.array([]),
+                                       np.array([]),
+                                       np.array([]),
+                                       0., 1.)
+    assert found.shape == (0,0)
+    # a single particle should return a 1 by 1 matrix
+    found = CALEFunctions.pt_laplacian(np.array([1.]),
+                                       np.array([0.]),
+                                       np.array([0.]),
+                                       0., 1.)
+    assert found.shape == (1,1)
+    # now we make an example event with 3 particles
+    pts = np.array([1., 1., 1.])
+    raps = np.array([0., 0., 0.])
+    phis = np.array([0., -1., 1.])
+    found = CALEFunctions.pt_laplacian(pts, raps, phis, 0., np.sqrt(0.5))
+    # as the pts are all 1. no pt factor will have an impact
+    aij = np.exp(-1.)
+    aij_large = np.exp(-4.)
+    expected = np.array([[2*aij, -aij, -aij],
+                         [-aij, aij + aij_large, -aij_large],
+                         [-aij, -aij_large, aij + aij_large]])
+    tst.assert_allclose(found, expected)
+    # changing the sigma should change the result
+    found = CALEFunctions.pt_laplacian(pts, raps, phis, 0., 2.)
+    aij = np.exp(-1./8.)
+    aij_large = np.exp(-1./2.)
+    expected = np.array([[2*aij, -aij, -aij],
+                         [-aij, aij + aij_large, -aij_large],
+                         [-aij, -aij_large, aij + aij_large]])
+    tst.assert_allclose(found, expected)
+    # changing the pt factor should change the result
+    found = CALEFunctions.pt_laplacian(pts, raps, phis, 1., np.sqrt(0.5))
+    aij = np.exp(-1.)
+    aij_large = np.exp(-4.)
+    cross = np.sqrt(2)*np.sqrt(3)
+    expected = np.array([[aij, -aij/cross, -aij/cross],
+                         [-aij/cross, (aij + aij_large)/3., -aij_large/3.],
+                         [-aij/cross, -aij_large/3., (aij + aij_large)/3.]])
+    tst.assert_allclose(found, expected)
+    # points can be at 0 distance
+    pts = np.array([1., 1., 1.])
+    raps = np.array([0., 0., 1.])
+    phis = np.array([0., 0., 0.])
+    found = CALEFunctions.pt_laplacian(pts, raps, phis, 0., np.sqrt(0.5))
+    aij = np.exp(-1.)
+    expected = np.array([[1. + aij, -1., -aij],
+                         [-1., 1. + aij, -aij],
+                         [-aij, -aij, 2*aij]])
+    tst.assert_allclose(found, expected)
+
+
 
 def test_set_scales():
     found = CALEFunctions.set_scales(1., 2., 0)
