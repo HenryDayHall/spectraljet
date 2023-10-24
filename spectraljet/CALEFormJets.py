@@ -104,14 +104,14 @@ class CALEv2(FormJets.Partitional):
         """ Runs before allocate """
         self._seed_labels = []
 
-    def _insert_new_seeds(self, n_seeds):
+    def _insert_new_seeds(self, n_seeds, mask):
         """
         Inserts new seeds into the clustering
         """
         seed_pxpypz, seed_ptrapphi = self._seed_generator(
-                self.Available_Energy,
-                self.Available_Px, self.Available_Py, self.Available_Pz,
-                self.Available_PT, self.Available_Rapidity, self.Available_Phi,
+                self.Energy[mask],
+                self.Px[mask], self.Py[mask], self.Pz[mask],
+                self.PT[mask], self.Rapidity[mask], self.Phi[mask],
                 n_centers=n_seeds)
         current_max_label = np.max(self.Label)
         for i in range(len(seed_ptrapphi)):
@@ -151,54 +151,61 @@ class CALEv2(FormJets.Partitional):
         self._available_idxs = [idx for idx in self._available_idxs if idx not in seed_idxs]
         self._available_mask[seed_idxs] = False
 
-    #def allocate(self):
-    #    """Sort the labels into exclusive jets"""
-    #    # the assumption is that this function returns a list of
-    #    # constituent labels for each jet
-    #    # then another function is called to actually form the jets
-    #    # As it forms the list it needs to keep track of the available
-    #    # particles itself, but aside from adding and removing seeds,
-    #    # there should eb no modification of the ints and floats
-    #    jet_list = []
-    #    unallocated_leaves = list(self.Leaf_Label)
-    #    # Cannot have more jets than input particles.
-    #    while unallocated_leaves:
-    #        self._insert_new_seeds()
-    #        mask = np.isin(self.Label, unallocated_leaves.union(self._seed_labels))
-    #        # this will include the current seeds.
-    #        laplacien = CALEFunctions.pt_laplacian(
-    #                self.PT[mask], self.Rapidity[mask], self.Phi[mask],
-    #                weight_exponent=self.WeightExponent, sigma=self.Sigma)
-    #        max_eigval = CALEFunctions.max_eigenvalue(laplacien)
-    #        num_points = len(laplacien)
-    #        seed_jets = []
-    #        found_content = False
-    #        for seed_label in self._seed_labels:
-    #            wavelet_delta = (self.Label[mask] == seed_label).astype(int)
-    #            # TODO, should the range be from 0 to max_eigval?
-    #            # do the eigenvalues actually go negative?
-    #            wavelets = CALEFunctions.cheby_op(wavelet_delta,
-    #                                              laplacien, [self._cheby_coeffs],
-    #                                              (0., max_eigval))
-    #            max_wavelet = np.max(wavelets)
-    #            min_wavelet = np.min(wavelets)
-    #            shifted_cutoff = (max_wavelet - min_wavelet)*(self.Cutoff + 1.)/2. + min_wavelet
-    #            below_cutoff = set(self.Label[mask][wavelets > shifted_cutoff])
-    #            jet_labels = list(below_cutoff & unallocated_leaves)
-    #            if jet_labels:
-    #                found_content = True
-    #                jet_list.append(jet_labels)
-    #                for label in labels:
-    #                    unallocated_leaves.remove(label)
-    #        # this batch of seeds is done.
-    #        self._remove_seeds()
-    #        if not found_content:
-    #            # sometimes the seed leads to no jets
-    #            break  # for now, we just give up if this happens
-    #    if unallocated_leaves:
-    #        # Store anything else as a 1-particle jet
-    #        jet_list += [[label] for label in unallocated_leaves]
-    #    return jet_list
+    def allocate(self, fig=None, ax=None):
+        """Sort the labels into exclusive jets"""
+        # the assumption is that this function returns a list of
+        # constituent labels for each jet
+        # then another function is called to actually form the jets
+        # As it forms the list it needs to keep track of the available
+        # particles itself, but aside from adding and removing seeds,
+        # there should eb no modification of the ints and floats
+        jet_list = []
+        unallocated_leaves = set(self.Leaf_Label)
+        n_seeds = 3
+        # Cannot have more jets than input particles.
+        while unallocated_leaves:
+            mask = np.isin(self.Label, list(unallocated_leaves))
+            self._insert_new_seeds(n_seeds, mask)
+            mask = np.isin(self.Label, list(unallocated_leaves) + self._seed_labels)
+            # this will include the current seeds.
+            laplacien = CALEFunctions.pt_laplacian(
+                    self.PT[mask], self.Rapidity[mask], self.Phi[mask],
+                    weight_exponent=self.WeightExponent, sigma=self.Sigma)
+            max_eigval = CALEFunctions.max_eigenvalue(laplacien)
+            num_points = len(laplacien)
+            seed_jets = []
+            found_content = False
+            for seed_label in self._seed_labels:
+                wavelet_delta = (self.Label[mask] == seed_label).astype(int)
+                # TODO, should the range be from 0 to max_eigval?
+                # do the eigenvalues actually go negative?
+                wavelets = CALEFunctions.cheby_op(wavelet_delta,
+                                                  laplacien, [self._cheby_coeffs],
+                                                  (-max_eigval, max_eigval))[0]
+                max_wavelet = np.max(wavelets)
+                min_wavelet = np.min(wavelets)
+                #shifted_cutoff = (max_wavelet - min_wavelet)*(self.Cutoff + 1.)/2. + min_wavelet
+                shifted_cutoff = (max_wavelet - min_wavelet)*self.Cutoff + min_wavelet
+                below_cutoff = set(self.Label[mask][wavelets > shifted_cutoff])
+                jet_labels = below_cutoff.intersection(unallocated_leaves)
+                if len(jet_labels) > 1:  # if there is only one object, it's not a jet.
+                    found_content = True
+                    jet_list.append(list(jet_labels))
+                    unallocated_leaves -= jet_labels
+                if not unallocated_leaves:
+                    break
+            # this batch of seeds is done.
+            self._remove_seeds()
+            if not found_content:
+                # sometimes the seed leads to no jets
+                if n_seeds > 30:
+                    break
+                else:
+                    n_seeds += 3
+        if unallocated_leaves:
+            # Store anything else as a 1-particle jet
+            jet_list += [[label] for label in unallocated_leaves]
+        return jet_list
 
     def plot_allocate(self, fig=None, ax=None):
         """Sort the labels into exclusive jets"""
@@ -213,10 +220,11 @@ class CALEv2(FormJets.Partitional):
         seed_values = []
         stalk_plot_vars = []
         unallocated_leaves = set(self.Leaf_Label)
-        n_seeds = 5
+        n_seeds = 3
         # Cannot have more jets than input particles.
         while unallocated_leaves:
-            self._insert_new_seeds(n_seeds)
+            mask = np.isin(self.Label, list(unallocated_leaves))
+            self._insert_new_seeds(n_seeds, mask)
             mask = np.isin(self.Label, list(unallocated_leaves) + self._seed_labels)
             # this will include the current seeds.
             laplacien = CALEFunctions.pt_laplacian(
@@ -236,7 +244,8 @@ class CALEv2(FormJets.Partitional):
                                                   (-max_eigval, max_eigval))[0]
                 max_wavelet = np.max(wavelets)
                 min_wavelet = np.min(wavelets)
-                shifted_cutoff = (max_wavelet - min_wavelet)*(self.Cutoff + 1.)/2. + min_wavelet
+                #shifted_cutoff = (max_wavelet - min_wavelet)*(self.Cutoff + 1.)/2. + min_wavelet
+                shifted_cutoff = (max_wavelet - min_wavelet)*self.Cutoff + min_wavelet
                 below_cutoff = set(self.Label[mask][wavelets > shifted_cutoff])
                 jet_labels = below_cutoff.intersection(unallocated_leaves)
                 if len(jet_labels) > 1:  # if there is only one object, it's not a jet.
@@ -251,7 +260,6 @@ class CALEv2(FormJets.Partitional):
                                         jet_content, np.where(self.Label[mask] == seed_label)[0]))
                 print(f"max_wavelet, {max_wavelet}, min_wavelet, {min_wavelet}, shifted_cutoff, {shifted_cutoff}")
                 print(f"jet length = {sum(jet_content)}")
-                break
                 if not unallocated_leaves:
                     break
             # this batch of seeds is done.
@@ -261,7 +269,7 @@ class CALEv2(FormJets.Partitional):
                 if n_seeds > 30:
                     break
                 else:
-                    n_seeds += 5
+                    n_seeds += 3
         plt_clustering(self, seed_values, made_jet, jet_list, stalk_plot_vars)
         if unallocated_leaves:
             # Store anything else as a 1-particle jet
