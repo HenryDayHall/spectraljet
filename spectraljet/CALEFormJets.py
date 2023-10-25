@@ -78,7 +78,7 @@ class CALE(FormJets.Partitional):
 class CALEv2(FormJets.Partitional):
     _cheby_coeffs = CALEFunctions.cheby_coeff(lambda x: np.exp(-x), 50)
     default_params = {'Sigma': 1.,
-                      'Cutoff': 0.9,
+                      'Cutoff': 0.3,
                       'WeightExponent': 0.,
                       'SeedGenerator': 'PtCenter'}
     permited_values = {'Sigma': Constants.numeric_classes['pdn'],
@@ -204,14 +204,14 @@ class CALEv2(FormJets.Partitional):
             seed_jets = []
             found_content = False
             for seed_label in self._seed_labels:
-                wavelet_delta = (self.Label[mask] == seed_label).astype(int)
+                seed_location = self.Label[mask] == seed_label
                 # TODO, should the range be from 0 to max_eigval?
                 # do the eigenvalues actually go negative?
-                wavelets = CALEFunctions.cheby_op(wavelet_delta,
+                wavelets = CALEFunctions.cheby_op(seed_location.astype(int),
                                                   laplacien, [self._cheby_coeffs],
                                                   (-max_eigval, max_eigval))[0]
-                max_wavelet = np.max(wavelets)
-                min_wavelet = np.min(wavelets)
+                max_wavelet = np.max(wavelets[~seed_location])
+                min_wavelet = np.min(wavelets[~seed_location])
                 shifted_cutoff = (max_wavelet - min_wavelet)*self.Cutoff + min_wavelet
                 below_cutoff = set(self.Label[mask][wavelets > shifted_cutoff])
                 jet_labels = below_cutoff.intersection(unallocated_leaves)
@@ -233,7 +233,7 @@ class CALEv2(FormJets.Partitional):
             jet_list += [[label] for label in unallocated_leaves]
         return jet_list
 
-    def plot_allocate(self, fig=None, ax=None):
+    def plot_allocate(self, inital_seeds=3, break_after_first=False, ignore_seed_wavelet=False):
         """Sort the labels into exclusive jets"""
         # the assumption is that this function returns a list of
         # constituent labels for each jet
@@ -242,11 +242,13 @@ class CALEv2(FormJets.Partitional):
         # particles itself, but aside from adding and removing seeds,
         # there should eb no modification of the ints and floats
         jet_list = []
+        # plotting data ~~~~~~~~~~~
         made_jet = []
         seed_values = []
         stalk_plot_vars = []
+        # ~~~~~~~~~~~~~~~~~~~~~~~~~
         unallocated_leaves = set(self.Leaf_Label)
-        n_seeds = 3
+        n_seeds = inital_seeds
         # Cannot have more jets than input particles.
         while unallocated_leaves:
             mask = np.isin(self.Label, list(unallocated_leaves))
@@ -261,42 +263,52 @@ class CALEv2(FormJets.Partitional):
             seed_jets = []
             found_content = False
             for seed_label in self._seed_labels:
-                seed_values.append(seed_label)
-                wavelet_delta = (self.Label[mask] == seed_label).astype(int)
+                seed_values.append(seed_label)  # plotting
+                seed_location = self.Label[mask] == seed_label
                 # TODO, should the range be from 0 to max_eigval?
                 # do the eigenvalues actually go negative?
-                wavelets = CALEFunctions.cheby_op(wavelet_delta,
+                wavelets = CALEFunctions.cheby_op(seed_location.astype(int),
                                                   laplacien, [self._cheby_coeffs],
                                                   (-max_eigval, max_eigval))[0]
-                max_wavelet = np.max(wavelets)
-                min_wavelet = np.min(wavelets)
-                #shifted_cutoff = (max_wavelet - min_wavelet)*(self.Cutoff + 1.)/2. + min_wavelet
+                if ignore_seed_wavelet:  # plotting
+                    max_wavelet = np.max(wavelets[~seed_location])
+                    min_wavelet = np.min(wavelets[~seed_location])
+                else:
+                    max_wavelet = np.max(wavelets)
+                    min_wavelet = np.min(wavelets)
                 shifted_cutoff = (max_wavelet - min_wavelet)*self.Cutoff + min_wavelet
                 below_cutoff = set(self.Label[mask][wavelets > shifted_cutoff])
                 jet_labels = below_cutoff.intersection(unallocated_leaves)
                 if len(jet_labels) > 1:  # if there is only one object, it's not a jet.
-                    made_jet.append(True)
+                    made_jet.append(True)  # plotting
                     found_content = True
                     jet_list.append(list(jet_labels))
                     unallocated_leaves -= jet_labels
                 else:
-                    made_jet.append(False)
+                    made_jet.append(False)  # plotting
+                # Plotting ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
                 jet_content = np.isin(self.Label[mask], list(jet_labels))
                 stalk_plot_vars.append((self.Rapidity[mask], self.Phi[mask], wavelets,
                                         jet_content, np.where(self.Label[mask] == seed_label)[0]))
                 print(f"max_wavelet, {max_wavelet}, min_wavelet, {min_wavelet}, shifted_cutoff, {shifted_cutoff}")
                 print(f"jet length = {sum(jet_content)}")
-                if not unallocated_leaves:
-                    break
+                # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                if len(unallocated_leaves) < 2:
+                    break  # one unallocated leaf cant be a jet
             # this batch of seeds is done.
             self._remove_seeds()
+            # plotting ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            if break_after_first:
+                break
+            # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             if not found_content:
+                n_seeds += 3
                 # sometimes the seed leads to no jets
-                if n_seeds > 30:
+                if n_seeds > self.max_seeds:
                     break
-                else:
-                    n_seeds += 3
+        # plotting ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         plt_clustering(self, seed_values, made_jet, jet_list, stalk_plot_vars)
+        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         if unallocated_leaves:
             # Store anything else as a 1-particle jet
             jet_list += [[label] for label in unallocated_leaves]
