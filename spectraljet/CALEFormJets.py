@@ -77,14 +77,42 @@ class CALE(FormJets.Partitional):
 
 class CALEv2(FormJets.Partitional):
     _cheby_coeffs = CALEFunctions.cheby_coeff(lambda x: np.exp(-x), 50)
-    default_params = {'Sigma': 2.,
-                      'Cutoff': 0,
+    default_params = {'Sigma': 1.,
+                      'Cutoff': 0.9,
                       'WeightExponent': 0.,
                       'SeedGenerator': 'PtCenter'}
     permited_values = {'Sigma': Constants.numeric_classes['pdn'],
                        'Cutoff': Constants.numeric_classes['rn'],
                        'WeightExponent': [0., Constants.numeric_classes['pdn']],
                        'SeedGenerator': ['PtCenter', 'Random', 'Unsafe']}
+    max_seeds = 30
+
+    def create_int_float_tables(self, start_ints, start_floats):
+        """ Format the data for clustering, allocating memory.
+        The tables have space for a center point for each pottential cluster.
+
+        Parameters
+        ----------
+        start_ints : list of list of int
+            initial integer input data for clustering
+        start_floats : list of list of floats
+            initial float input data for clustering
+
+        Returns
+        -------
+        ints : list of list of int
+            integer input data for clustering
+        floats : list of list of floats
+            float input data for clustering
+        """
+        ints, floats = super().create_int_float_tables(start_ints, start_floats)
+        seed_ints = -np.ones((self.max_seeds, len(self.int_columns)),
+                             dtype=int)
+        ints = np.vstack((ints, seed_ints))
+        seed_floats = -np.ones((self.max_seeds, len(self.float_columns)),
+                               dtype=float)
+        floats = np.vstack((floats, seed_floats))
+        return ints, floats
 
     def _setup_clustering_functions(self):
         """
@@ -198,7 +226,7 @@ class CALEv2(FormJets.Partitional):
             self._remove_seeds()
             if not found_content:
                 # sometimes the seed leads to no jets
-                if n_seeds > 30:
+                if n_seeds > self.max_seeds:
                     break
                 else:
                     n_seeds += 3
@@ -367,5 +395,7 @@ def plot_points_on_stalks(ax, colour, points_xs, points_ys, points_zs, idxs_sele
 
 FormJets.cluster_classes["CALE"] = CALE
 FormJets.multiapply_input["CALE"] = CALE
+FormJets.cluster_classes["CALEv2"] = CALEv2
+FormJets.multiapply_input["CALEv2"] = CALEv2
 FormJets.cluster_classes["CALECpp"] = CALECpp
 FormJets.multiapply_input["CALECpp"] = CALECpp
