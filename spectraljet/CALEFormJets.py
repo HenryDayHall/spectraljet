@@ -212,7 +212,6 @@ class CALEv2(FormJets.Partitional):
                                                   (-max_eigval, max_eigval))[0]
                 max_wavelet = np.max(wavelets)
                 min_wavelet = np.min(wavelets)
-                #shifted_cutoff = (max_wavelet - min_wavelet)*(self.Cutoff + 1.)/2. + min_wavelet
                 shifted_cutoff = (max_wavelet - min_wavelet)*self.Cutoff + min_wavelet
                 below_cutoff = set(self.Label[mask][wavelets > shifted_cutoff])
                 jet_labels = below_cutoff.intersection(unallocated_leaves)
@@ -220,16 +219,15 @@ class CALEv2(FormJets.Partitional):
                     found_content = True
                     jet_list.append(list(jet_labels))
                     unallocated_leaves -= jet_labels
-                if not unallocated_leaves:
-                    break
+                if len(unallocated_leaves) < 2:
+                    break  # one unallocated leaf cant be a jet
             # this batch of seeds is done.
             self._remove_seeds()
             if not found_content:
+                n_seeds += 3
                 # sometimes the seed leads to no jets
                 if n_seeds > self.max_seeds:
                     break
-                else:
-                    n_seeds += 3
         if unallocated_leaves:
             # Store anything else as a 1-particle jet
             jet_list += [[label] for label in unallocated_leaves]
