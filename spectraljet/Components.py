@@ -644,13 +644,14 @@ class EventWise:
         columns = list(contents['column_order'])
         hyperparameter_columns =\
             list(contents['hyperparameter_column_order'])
-        gitdict_prefix = "gitdict_"
-        len_prefix = len(gitdict_prefix)
-        gitdict = {key[len_prefix:]: contents[key]
-                   for key in ak.fields(contents)
-                   if key.startswith(gitdict_prefix)}
-        if not gitdict:  # the file format is outdated
-            gitdict = 'old'
+        #gitdict_prefix = "gitdict_"
+        #len_prefix = len(gitdict_prefix)
+        #gitdict = {key[len_prefix:]: contents[key]
+        #           for key in ak.fields(contents)
+        #           if key.startswith(gitdict_prefix)}
+        #if not gitdict:  # the file format is outdated
+        #    gitdict = 'old'
+        gitdict = 'old'
         # the contents have the one dim 0th axis, so add them later
         new_eventWise = cls(path, columns=columns,
                             hyperparameter_columns=hyperparameter_columns,
@@ -1231,6 +1232,9 @@ class EventWise:
         check_weighted_average : callable that returns bool (optional)
             Should return true for hyperparameters for which the weighted
             average should be taken instead of checking for a match
+            By default, anything that contains the string "Ave"
+            or "Quality" and ends in a word from 
+            Constants.SCORE_COLS will be averaged.
         check_wanted : callable that returns bool (optional)
             Makes a lightweight version of the combined eventWise files,
             only containing contents that pass the check.
@@ -1245,7 +1249,11 @@ class EventWise:
             def check_wanted(_):
                 return True
         if check_weighted_average is None:
-            def check_weighted_average(_):
+            def check_weighted_average(column):
+                if "Ave" in column or "Quality" in column:
+                    contains = next((score for score in Constants.SCORE_COLS
+                                     if column.endswith(score)), False)
+                    return contains
                 return False
 
         in_dir = os.listdir(dir_name)

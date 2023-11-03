@@ -82,3 +82,13 @@ import os as _os
 _this_dir = _os.path.dirname(_os.path.abspath(__file__))
 CALE_build_dir = _os.path.join(_this_dir, "build_CALE")
 
+# columns used for scoring events
+SCORE_COLS = ["QualityWidth", "QualityFraction",
+              "AveSignalMassRatio", "AveBGMassRatio",
+              "AveDistancePT", "AveDistancePhi", "AveDistanceRapidity",
+              "AvePercentFound",
+              "AveDistanceBG", "AveDistanceSignal", "AveSeperateJets",
+              "SeperateAveSignalMassRatio", "SeperateAveBGMassRatio",
+              "SeperateAveDistancePT", "SeperateAveDistancePhi",
+              "SeperateAveDistanceRapidity",
+              "SeperateAveDistanceBG", "SeperateAveDistanceSignal"]
