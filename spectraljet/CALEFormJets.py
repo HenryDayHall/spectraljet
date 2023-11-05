@@ -80,11 +80,13 @@ class CALEv2(FormJets.Partitional):
     default_params = {'Sigma': 1.,
                       'Cutoff': 0.3,
                       'WeightExponent': 0.,
-                      'SeedGenerator': 'PtCenter'}
+                      'SeedGenerator': 'PtCenter',
+                      'SeedIncrement': 3}
     permited_values = {'Sigma': Constants.numeric_classes['pdn'],
                        'Cutoff': Constants.numeric_classes['rn'],
                        'WeightExponent': [0., Constants.numeric_classes['pdn']],
-                       'SeedGenerator': ['PtCenter', 'Random', 'Unsafe']}
+                       'SeedGenerator': ['PtCenter', 'Random', 'Unsafe'],
+                       'SeedIncrement': Constants.numeric_classes['nn']}
     max_seeds = 30
 
     def create_int_float_tables(self, start_ints, start_floats):
@@ -189,7 +191,7 @@ class CALEv2(FormJets.Partitional):
         # there should eb no modification of the ints and floats
         jet_list = []
         unallocated_leaves = set(self.Leaf_Label)
-        n_seeds = 3
+        n_seeds = self.SeedIncrement
         # Cannot have more jets than input particles.
         while unallocated_leaves:
             mask = np.isin(self.Label, list(unallocated_leaves))
@@ -224,7 +226,7 @@ class CALEv2(FormJets.Partitional):
             # this batch of seeds is done.
             self._remove_seeds()
             if not found_content:
-                n_seeds += 3
+                n_seeds += self.SeedIncrement
                 # sometimes the seed leads to no jets
                 if n_seeds > self.max_seeds:
                     break
@@ -233,7 +235,7 @@ class CALEv2(FormJets.Partitional):
             jet_list += [[label] for label in unallocated_leaves]
         return jet_list
 
-    def plot_allocate(self, inital_seeds=3, break_after_first=False, ignore_seed_wavelet=False):
+    def plot_allocate(self, break_after_first=False, ignore_seed_wavelet=False):
         """Sort the labels into exclusive jets"""
         # the assumption is that this function returns a list of
         # constituent labels for each jet
@@ -248,7 +250,7 @@ class CALEv2(FormJets.Partitional):
         stalk_plot_vars = []
         # ~~~~~~~~~~~~~~~~~~~~~~~~~
         unallocated_leaves = set(self.Leaf_Label)
-        n_seeds = inital_seeds
+        n_seeds = self.SeedIncrement
         # Cannot have more jets than input particles.
         while unallocated_leaves:
             mask = np.isin(self.Label, list(unallocated_leaves))
@@ -302,7 +304,7 @@ class CALEv2(FormJets.Partitional):
                 break
             # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             if not found_content:
-                n_seeds += 3
+                n_seeds += self.SeedIncrement
                 # sometimes the seed leads to no jets
                 if n_seeds > self.max_seeds:
                     break
