@@ -254,6 +254,39 @@ def pt_laplacian(pts, rapidities, phis, weight_exponent, sigma):
     return laplacian
 
 
+def pt_laplacian_inv(pts, rapidities, phis, weight_exponent, power):
+    """
+    A laplacian matrix, where affinities have been scaled by pt,
+    and the laplacian itself is normalised by p_Ti*sum_j p_Tj dij
+
+    Parameters
+    ----------
+    pts : numpy array of floats length N
+      pts of existing particles
+    rapidities : numpy array of floats length N
+      rapidities of existing particles
+    phis : numpy array of floats length N
+      phis of existing particles
+    weight_exponent : float
+      An exponent on the distance factor of other weights.
+    power : float
+      Positive float which is a parameter of the affinities
+
+    Returns
+    -------
+    laplacian : numpy array of floats (N, N)
+      Pt normalised laplacian matrix
+    """
+    ca_distances2 = FormJets.ca_distances2(rapidities, phis)
+    pt_col = pts.reshape(-1, 1)
+    affinities = pts * pt_col * ca_distances2**(-0.5*power)
+    np.fill_diagonal(affinities, 0.)
+    # if the exponent is 0, this is equivalent to normalisation = pts
+    normalisation = pts * np.sum(pt_col * ca_distances2**0.5, axis=0)**weight_exponent
+    laplacian = FormJets.normalised_laplacian(affinities, normalisation)
+    return laplacian
+
+
 def max_eigenvalue(L):
     """Upper-bound on the spectrum."""
     try:
