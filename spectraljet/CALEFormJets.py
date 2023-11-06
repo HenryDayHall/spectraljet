@@ -81,11 +81,13 @@ class CALEv2(FormJets.Partitional):
                       'Cutoff': 0.3,
                       'WeightExponent': 0.,
                       'SeedGenerator': 'PtCenter',
+                      'ToAffinity': 'exp',
                       'SeedIncrement': 3}
     permited_values = {'Sigma': Constants.numeric_classes['pdn'],
                        'Cutoff': Constants.numeric_classes['rn'],
                        'WeightExponent': [0., Constants.numeric_classes['pdn']],
                        'SeedGenerator': ['PtCenter', 'Random', 'Unsafe'],
+                       'ToAffinity': ['exp', 'inv'],
                        'SeedIncrement': Constants.numeric_classes['nn']}
     max_seeds = 30
 
@@ -129,6 +131,12 @@ class CALEv2(FormJets.Partitional):
             self._seed_generator = CALEFunctions.unsafe_centers
         else:
             raise ValueError('SeedGenerator must be PtCenter, Unsafe or Random')
+        if self.ToAffinity == 'exp':
+            self._to_laplacian = CALEFunctions.pt_laplacian
+        elif self.ToAffinity == 'inv':
+            self._to_laplacian = CALEFunctions.pt_laplacian_inv
+        else:
+            raise ValueError('ToAffinity must be exp or inv')
 
     def setup_internal(self):
         """ Runs before allocate """
@@ -198,7 +206,7 @@ class CALEv2(FormJets.Partitional):
             self._insert_new_seeds(n_seeds, mask)
             mask = np.isin(self.Label, list(unallocated_leaves) + self._seed_labels)
             # this will include the current seeds.
-            laplacien = CALEFunctions.pt_laplacian(
+            laplacien = CALEFunctions._to_laplacian(
                     self.PT[mask], self.Rapidity[mask], self.Phi[mask],
                     weight_exponent=self.WeightExponent, sigma=self.Sigma)
             max_eigval = CALEFunctions.max_eigenvalue(laplacien)
@@ -257,7 +265,7 @@ class CALEv2(FormJets.Partitional):
             self._insert_new_seeds(n_seeds, mask)
             mask = np.isin(self.Label, list(unallocated_leaves) + self._seed_labels)
             # this will include the current seeds.
-            laplacien = CALEFunctions.pt_laplacian(
+            laplacien = CALEFunctions._to_laplacian(
                     self.PT[mask], self.Rapidity[mask], self.Phi[mask],
                     weight_exponent=self.WeightExponent, sigma=self.Sigma)
             max_eigval = CALEFunctions.max_eigenvalue(laplacien)
