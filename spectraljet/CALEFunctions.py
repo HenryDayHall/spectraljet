@@ -259,9 +259,6 @@ def max_eigenvalue(L):
     try:
         values = ssl.eigsh(L, k=1, which='LM', return_eigenvectors=False)
     except (ssl.eigen.arpack.ArpackNoConvergence, RuntimeError) as e:
-        print(f"error getting max eigen = {e}")
-        print(L)
-        print("XXXXXXXXX")
         # sparse version didn't converge.
         # try non sparse version.
         last_index = L.shape[0] - 1
