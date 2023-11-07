@@ -78,12 +78,14 @@ class CALE(FormJets.Partitional):
 class CALEv2(FormJets.Partitional):
     _cheby_coeffs = CALEFunctions.cheby_coeff(lambda x: np.exp(-x), 50)
     default_params = {'Sigma': 1.,
+                      'InvPower': 1.,
                       'Cutoff': 0.3,
                       'WeightExponent': 0.,
                       'SeedGenerator': 'PtCenter',
                       'ToAffinity': 'exp',
                       'SeedIncrement': 3}
     permited_values = {'Sigma': Constants.numeric_classes['pdn'],
+                       'InvPower': Constants.numeric_classes['pdn'],
                        'Cutoff': Constants.numeric_classes['rn'],
                        'WeightExponent': [0., Constants.numeric_classes['pdn']],
                        'SeedGenerator': ['PtCenter', 'Random', 'Unsafe'],
@@ -132,11 +134,16 @@ class CALEv2(FormJets.Partitional):
         else:
             raise ValueError('SeedGenerator must be PtCenter, Unsafe or Random')
         if self.ToAffinity == 'exp':
-            self._to_laplacian = CALEFunctions.pt_laplacian
+            def laplacian(pts, rapidities, phis):
+                return CALEFunctions.pt_laplacian(pts, rapidities, phis,
+                    weight_exponent=self.WeightExponent, sigma=self.Sigma)
         elif self.ToAffinity == 'inv':
-            self._to_laplacian = CALEFunctions.pt_laplacian_inv
+            def laplacian(pts, rapidities, phis):
+                return CALEFunctions.pt_laplacian_inv(pts, rapidities, phis,
+                    weight_exponent=self.WeightExponent, power=self.InvPower)
         else:
             raise ValueError('ToAffinity must be exp or inv')
+        self._to_laplacian = laplacian
 
     def setup_internal(self):
         """ Runs before allocate """
@@ -206,9 +213,8 @@ class CALEv2(FormJets.Partitional):
             self._insert_new_seeds(n_seeds, mask)
             mask = np.isin(self.Label, list(unallocated_leaves) + self._seed_labels)
             # this will include the current seeds.
-            laplacien = CALEFunctions._to_laplacian(
-                    self.PT[mask], self.Rapidity[mask], self.Phi[mask],
-                    weight_exponent=self.WeightExponent, sigma=self.Sigma)
+            laplacien = self._to_laplacian(
+                    self.PT[mask], self.Rapidity[mask], self.Phi[mask])
             max_eigval = CALEFunctions.max_eigenvalue(laplacien)
             num_points = len(laplacien)
             seed_jets = []
@@ -265,9 +271,8 @@ class CALEv2(FormJets.Partitional):
             self._insert_new_seeds(n_seeds, mask)
             mask = np.isin(self.Label, list(unallocated_leaves) + self._seed_labels)
             # this will include the current seeds.
-            laplacien = CALEFunctions._to_laplacian(
-                    self.PT[mask], self.Rapidity[mask], self.Phi[mask],
-                    weight_exponent=self.WeightExponent, sigma=self.Sigma)
+            laplacien = self._to_laplacian(
+                    self.PT[mask], self.Rapidity[mask], self.Phi[mask])
             max_eigval = CALEFunctions.max_eigenvalue(laplacien)
             num_points = len(laplacien)
             seed_jets = []
