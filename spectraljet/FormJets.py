@@ -1083,7 +1083,7 @@ class Agglomerative(Clustering):
         sorter = np.argsort(self.Label)
         jet_idxs = sorter[np.searchsorted(self.Label, jet_labels,
                                           sorter=sorter)]
-        self._update_avalible(self, jet_idxs)
+        self._update_avalible(jet_idxs)
         # chose the new
         new_label = np.max(self.Label) + 1
         new_idx = self._next_free_row()
@@ -1203,95 +1203,8 @@ class Agglomerative(Clustering):
         return jet_list
 
 
-class BinaryTree(Clustering):
+class BinaryTree(Agglomerative):
     debug_attributes = ["available_mask"]
-
-    def create_int_float_tables(self, start_ints, start_floats):
-        """ Format the data for clustering, allocating memory.
-        The tables created have space for pesudojets that will be created.
-
-        Parameters
-        ----------
-        start_ints : list of list of int
-            initial integer input data for clustering
-        start_floats : list of list of floats
-            initial float input data for clustering
-
-        Returns
-        -------
-        ints : list of list of int
-            integer input data for clustering
-        floats : list of list of floats
-            float input data for clustering
-        """
-        start_labels = [row[self._col_num["Label"]] for row in start_ints]
-        assert -1 not in start_labels, "-1 is a reserved label"
-        # this will form a binary tree,
-        # so at most there can be
-        # n_inputs + (n_unclustered*(n_unclustered-1))/2
-        n_inputs = len(start_ints)
-        if n_inputs == 0:
-            ints = np.empty((0, len(self.int_columns)))
-            floats = np.empty((0, len(self.float_columns)))
-            return ints, floats
-        assert n_inputs < self.memory_cap, \
-            f"More particles ({n_inputs}) than possible " +\
-            f"with this memory_cap ({self.memory_cap})"
-        # don't assume the form of start_ints
-        n_unclustered = np.sum([row[self._col_num["Parent"]] == -1
-                                for row in start_ints])
-        max_elements = n_inputs + int(0.5*(n_unclustered*(n_unclustered-1)))
-        # we limit the maximum elements in memory
-        max_elements = min(max_elements, self.memory_cap)
-        ints = -np.ones((max_elements, len(self.int_columns)),
-                        dtype=int)
-        ints[:n_inputs] = start_ints
-        floats = np.full((max_elements, len(self.float_columns)),
-                         np.nan, dtype=float)
-        floats[:n_inputs] = start_floats
-        return ints, floats
-
-    @property
-    def _2d_available_indices(self):
-        """
-        Using the _available_idxs make indices for indexing
-        the corrisponding minor or a 2d matrix.
-
-        Returns
-        -------
-        : tuple of arrays
-            tuple that will index the matrix minor
-        """
-        num_avail = len(self._available_idxs)
-        avail = np.tile(self._available_idxs, (num_avail, 1)).astype(int)
-        return avail.T, avail
-        
-    def _reoptimise_preallocated(self):
-        """Rearange the objects in memory to accomidate more.
-
-        Memory limit has been reached, the preallocated arrays
-        need to be rearanged to allow for removing objects which
-        are no longer needed.
-        anything still in _available_idxs will not be moved.
-        Also, remove anything in debug_data, becuase it will be
-        invalidated.
-        """
-        not_available = np.where(~self._available_mask)[0]
-        not_a_ints = self._ints[not_available]
-        not_a_floats = self._floats[not_available]
-        # before they are erased, add them to the back of the arrays
-        self._ints = np.concatenate((self._ints, not_a_ints))
-        self._floats = np.concatenate((self._floats, not_a_floats))
-        # now wipe those rows
-        self._ints[not_available] = -1
-        self._floats[not_available] = 0.
-        # avaliability remains as before
-        # so any other
-        # matrix can be ignored, assuming you only use
-        # available row/cols
-        if hasattr(self, "debug_data"):
-            # this is outdated, so scrap it
-            self.debug_data = {name: [] for name in self.debug_data}
 
     def run(self):
         """Perform the clustering, without storing debug_data."""
@@ -2177,7 +2090,7 @@ class SpectralMean(BinaryTree):
         self._distances2[:, idx_parent] = new_distances2
 
 
-class Partitional(Clustering):
+class Partitional(Agglomerative):
     def create_int_float_tables(self, start_ints, start_floats):
         """ Format the data for clustering, allocating memory.
         The tables have space for a center point for each pottential cluster.
@@ -2227,59 +2140,6 @@ class Partitional(Clustering):
     def allocate(self):
         raise NotImplementedError
 
-    def create_jet(self, jet_labels):
-        """
-        Form a new jet by combinging many pseudojets,
-        also updating avaliability.
-
-        Parameters
-        ----------
-        idx1 : int
-            index of the first pseudojet to input
-        idx2 : int
-            index of the second pseudojet to input
-        distance2 : float
-            distanc esquared between the pseudojets
-
-        Returns
-        -------
-        ints : list of ints
-            int columns of the combined pseudojet,
-            order as per the column attributes
-        floats : list of floats
-            float columns of the combined pseudojet,
-            order as per the column attributes
-        """
-        # find the inputs
-        sorter = np.argsort(self.Label)
-        jet_idxs = sorter[np.searchsorted(self.Label, jet_labels,
-                                          sorter=sorter)]
-        # chose the new
-        new_label = np.max(self.Label) + 1
-        new_idx = self._next_free_row()
-        self.Label[new_idx] = new_label
-        # center objects are defined by being their own children
-        # and having Parent=-1
-        self.Child1[new_idx] = new_label
-        self.Child2[new_idx] = new_label
-        self.Rank[new_idx] = 0
-        # set the parents of the jet contents
-        self.Parent[jet_idxs] = new_label
-        # PT px py pz eta phi energy join_distance
-        self.Energy[new_idx] = np.sum(self.Energy[jet_idxs])
-        self.Px[new_idx] = np.sum(self.Px[jet_idxs])
-        self.Py[new_idx] = np.sum(self.Py[jet_idxs])
-        self.Pz[new_idx] = np.sum(self.Pz[jet_idxs])
-        self.Size[new_idx] = np.sum(self.Size[jet_idxs])
-        # it's easier conceptually to calculate pt, phi and rapidity
-        # afresh than derive them
-        # for some reason this must be unpacked then assigned
-        phi, pt = Components.pxpy_to_phipt(self.Px[new_idx], self.Py[new_idx])
-        self.Phi[new_idx] = phi
-        self.PT[new_idx] = pt
-        self.Rapidity[new_idx] = \
-            Components.ptpze_to_rapidity(self.PT[new_idx], self.Pz[new_idx],
-                                         self.Energy[new_idx])
 
     def split(self):
         """
