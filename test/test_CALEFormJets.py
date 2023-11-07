@@ -229,3 +229,8 @@ class TestCALEv2(TestCALE):
         test_FormJets.match_ints_floats(ints, floats,
                                         algo._ints[:len(ints)], algo._floats[:len(floats)])
 
+
+class TestCALEv3(TestCALEv2):
+    to_test = CALEFormJets.CALEv3
+    jet_params = dict(Sigma=0.3, Cutoff=0.02, WeightExponent=1., SeedGenerator='PtCenter')
+

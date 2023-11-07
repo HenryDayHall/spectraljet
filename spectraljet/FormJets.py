@@ -975,7 +975,7 @@ class Agglomerative(Clustering):
         # don't assume the form of start_ints
         n_unclustered = np.sum([row[self._col_num["Parent"]] == -1
                                 for row in start_ints])
-        max_elements = n_inputs + int(0.5*(n_unclustered*(n_unclustered-1)))
+        max_elements = n_inputs + int(0.5*(n_unclustered*(n_unclustered-1))) + 1
         # we limit the maximum elements in memory
         max_elements = min(max_elements, self.memory_cap)
         ints = -np.ones((max_elements, len(self.int_columns)),
@@ -1034,9 +1034,9 @@ class Agglomerative(Clustering):
             return
         self.setup_internal()
         while True:
-            list_of_jets = self.next_jets()
-            if self.stopping_condition(list_of_jets):
+            if self.stopping_condition():
                 break
+            list_of_jets = self.next_jets()
             for jet in list_of_jets:
                 self.create_jet(jet)
         unallocated_leaves = [self.Label[idx] for idx in self._available_idxs
@@ -1046,13 +1046,8 @@ class Agglomerative(Clustering):
             for loose in unallocated_leaves:
                 self.create_jet([loose])
 
-    def stopping_condition(self, list_of_jets):
+    def stopping_condition(self):
         """ Will be called before taking another step.
-
-        Parameters
-        ----------
-        list_of_jets : list of list of int
-            indices of all the jets that will be merged
 
         Returns
         -------
@@ -1097,7 +1092,7 @@ class Agglomerative(Clustering):
         # and having Parent=-1
         self.Child1[new_idx] = new_label
         self.Child2[new_idx] = new_label
-        self.Rank[new_idx] = 0
+        self.Rank[new_idx] = np.max(self.Rank[jet_idxs]) + 1
         # set the parents of the jet contents
         self.Parent[jet_idxs] = new_label
         # PT px py pz eta phi energy join_distance

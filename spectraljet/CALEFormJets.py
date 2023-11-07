@@ -377,7 +377,6 @@ class CALEv3(FormJets.Agglomerative):
         """ Runs before allocate """
         self._seed_labels = []
         self._n_seeds = self.SeedIncrement
-        self._should_stop = False
 
     def _insert_new_seeds(self, n_seeds, mask):
         """
@@ -426,8 +425,13 @@ class CALEv3(FormJets.Agglomerative):
         self._available_idxs = [idx for idx in self._available_idxs if idx not in seed_idxs]
         self._available_mask[seed_idxs] = False
 
-    def stopping_condition(self, _):
-        return self._should_stop
+    def stopping_condition(self):
+        # sometimes the seed leads to no jets
+        if self._n_seeds > self.max_seeds:
+            return True
+        if len(self._available_idxs) < 2:
+            return True
+        return False
 
     def next_jets(self, fig=None, ax=None):
         """Sort the labels into exclusive jets"""
@@ -471,9 +475,6 @@ class CALEv3(FormJets.Agglomerative):
         self._n_seeds += self.SeedIncrement
         if not found_content:
             self._n_seeds += self.SeedIncrement
-            # sometimes the seed leads to no jets
-            if self._n_seeds > self.max_seeds:
-                self._should_stop = True
         return jet_list
 
     def plot_next_jets(self, num_seeds=None, fig=None, ax=None):
@@ -539,9 +540,6 @@ class CALEv3(FormJets.Agglomerative):
         # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         if not found_content:
             self._n_seeds += self.SeedIncrement
-            # sometimes the seed leads to no jets
-            if self._n_seeds > self.max_seeds:
-                self._should_stop = True
         return jet_list
 
 

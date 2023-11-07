@@ -515,8 +515,8 @@ def test_Agglomerative_setup_ints_floats():
         ew.selected_event = 0
         set_JetInputs(ew, floats)
         agg = FormJets.GeneralisedKT(ew)
-        # should make 3 rows so there is a row for the 
-        tst.assert_allclose(agg._available_mask, [True, True, False])
+        # should make 4 rows so there is a row for the 
+        tst.assert_allclose(agg._available_mask, [True, True, False, False])
         tst.assert_allclose(agg.PT[:2], np.ones(2))
         assert {0, 1} == set(agg._available_idxs)
         assert set(agg.Label) == {-1, 0, 1}
@@ -787,7 +787,7 @@ def test_Agglomerative_split():
     agg = FormJets.GeneralisedKT((ints, floats), memory_cap=10)
     jet_list = agg.split()
     assert len(jet_list) == 1
-    assert len(jet_list[0].Label) == 3
+    assert len(jet_list[0].Label) == 4
     ints = np.array([[0, 1, -1, -1, 0],
                      [2, 1, -1, -1, 0],
                      [1, -1, 2, 0, 1],
@@ -796,7 +796,7 @@ def test_Agglomerative_split():
     agg = FormJets.GeneralisedKT((ints, floats), memory_cap=10)
     jet_list = agg.split()
     assert len(jet_list) == 2
-    assert {len(j.Label) for j in jet_list} == {1, 3}
+    assert {len(j.Label) for j in jet_list} == {2, 4}
 
 #class GeneralisedKT(Agglomerative):
 
