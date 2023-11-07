@@ -641,5 +641,7 @@ FormJets.cluster_classes["CALE"] = CALE
 FormJets.multiapply_input["CALE"] = CALE
 FormJets.cluster_classes["CALEv2"] = CALEv2
 FormJets.multiapply_input["CALEv2"] = CALEv2
+FormJets.cluster_classes["CALEv3"] = CALEv3
+FormJets.multiapply_input["CALEv3"] = CALEv3
 FormJets.cluster_classes["CALECpp"] = CALECpp
 FormJets.multiapply_input["CALECpp"] = CALECpp
