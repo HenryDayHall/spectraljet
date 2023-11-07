@@ -607,7 +607,7 @@ class Clustering:
         self.memory_cap = kwargs.get('memory_cap', 20000)
         self.setup_hyperparams(kwargs.get('dict_jet_params', {}))
         self.setup_column_numbers()
-        self.jet_name = kwargs.get('jet_name', "AgglomerativeJet")
+        self.jet_name = kwargs.get('jet_name', "BinaryTreeJet")
         if not self.jet_name.endswith("Jet"):
             self.jet_name += "Jet"
         self._ints, self._floats = None, None
@@ -1034,6 +1034,271 @@ class Agglomerative(Clustering):
             return
         self.setup_internal()
         while True:
+            list_of_jets = self.next_jets()
+            if self.stopping_condition(list_of_jets):
+                break
+            for jet in list_of_jets:
+                self.create_jet(jet)
+
+
+    def stopping_condition(self, list_of_jets):
+        """ Will be called before taking another step.
+
+        Parameters
+        ----------
+        list_of_jets : list of list of int
+            indices of all the jets that will be merged
+
+        Returns
+        -------
+        : bool
+            True if the clustering should stop now, else False.
+        """
+        raise NotImplementedError
+
+    def create_jet(self, jet_labels):
+        """
+        Create a new jet by combining to specified pseudojets,
+        also declare the combined components unavaliable.
+
+        Parameters
+        ----------
+        idx1 : int
+            index of the first pseudojet to input
+        idx2 : int
+            index of the second pseudojet to input
+        distance2 : float
+            distanc esquared between the pseudojets
+
+        Returns
+        -------
+        ints : list of ints
+            int columns of the combined pseudojet,
+            order as per the column attributes
+        floats : list of floats
+            float columns of the combined pseudojet,
+            order as per the column attributes
+        """
+        # find the inputs
+        sorter = np.argsort(self.Label)
+        jet_idxs = sorter[np.searchsorted(self.Label, jet_labels,
+                                          sorter=sorter)]
+        self._update_avalible(self, jet_idxs)
+        # chose the new
+        new_label = np.max(self.Label) + 1
+        new_idx = self._next_free_row()
+        self.Label[new_idx] = new_label
+        # center objects are defined by being their own children
+        # and having Parent=-1
+        self.Child1[new_idx] = new_label
+        self.Child2[new_idx] = new_label
+        self.Rank[new_idx] = 0
+        # set the parents of the jet contents
+        self.Parent[jet_idxs] = new_label
+        # PT px py pz eta phi energy join_distance
+        self.Energy[new_idx] = np.sum(self.Energy[jet_idxs])
+        self.Px[new_idx] = np.sum(self.Px[jet_idxs])
+        self.Py[new_idx] = np.sum(self.Py[jet_idxs])
+        self.Pz[new_idx] = np.sum(self.Pz[jet_idxs])
+        self.Size[new_idx] = np.sum(self.Size[jet_idxs])
+        # it's easier conceptually to calculate pt, phi and rapidity
+        # afresh than derive them
+        # for some reason this must be unpacked then assigned
+        phi, pt = Components.pxpy_to_phipt(self.Px[new_idx], self.Py[new_idx])
+        self.Phi[new_idx] = phi
+        self.PT[new_idx] = pt
+        self.Rapidity[new_idx] = \
+            Components.ptpze_to_rapidity(self.PT[new_idx], self.Pz[new_idx],
+                                         self.Energy[new_idx])
+
+    def next_jets(self):
+        """ Find the next jets to form
+
+        Return
+        ----------
+        jets : list of list of int
+            indices of all the jets that will be merged
+        """
+        raise NotImplementedError
+
+
+    def get_decendants(self, last_only=True, start_label=None, start_idx=None):
+        """
+        Get all decendants of a chosen particle
+        within the structure of the jet.
+
+        Parameters
+        ----------
+        last_only : bool
+            Only return the end point decendants
+            (Default value = True)
+        start_label : int
+            start_label used to identify the starting particle
+            if not given idx required
+            (Default value = None)
+        start_idx : int
+            Internal index to identify the particle
+            if not given start_label required
+            (Default value = None)
+
+        Returns
+        -------
+        decendants : list of ints
+            local indices of the decendants
+
+        """
+        labels = self.Label
+        parents = self.Parent
+        # eraise any parents if the particle isn't real
+        parents[labels == -1] = -1
+        if start_idx is None:
+            start_idx = np.where(label == start_label)[0][0]
+        elif start_label is None:
+            start_label = label[start_idx]
+        else:
+            raise TypeError("Need to specify a pseudojet")
+        labels = labels.tolist()
+        stack = [start_idx]
+        decendants = []
+        while stack:
+            idx = stack.pop()
+            label = labels[idx]
+            local_decendants = np.where(parents == label)[0].tolist()
+            if not local_decendants:
+                decendants.append(idx)
+                continue
+            stack += local_decendants
+            if not last_only:
+                decendants.append(idx)
+        return decendants
+
+    def split(self):
+        """
+        Split this jet into as many unconnected jets as it contains
+
+        Returns
+        -------
+        jet_list : list of Clustering
+            the indervidual jets found in here
+        """
+        if self._ints.shape[0] == 0:  # nothing else to do if the jet is empty
+            return []
+        mask = self.Label != -1
+        roots = np.where(mask)[0][self.Parent[mask] == -1]
+        jet_list = []
+        jet_params = {name: getattr(self, name, self.default_params[name])
+                      for name in self.default_params}
+        for root in roots:
+            group = self.get_decendants(last_only=False, start_idx=root)
+            ints = self._ints[group]
+            floats = self._floats[group]
+            # setting the momory cap to the length of the ints
+            # prevents any additional space, beyond what is
+            # strictly needed being allocated to this jet
+            jet = type(self)(input_data=(ints, floats),
+                             jet_name=self.jet_name,
+                             dict_jet_params=jet_params,
+                             memory_cap=len(ints)+1)
+            jet_list.append(jet)
+        return jet_list
+
+
+class BinaryTree(Clustering):
+    debug_attributes = ["available_mask"]
+
+    def create_int_float_tables(self, start_ints, start_floats):
+        """ Format the data for clustering, allocating memory.
+        The tables created have space for pesudojets that will be created.
+
+        Parameters
+        ----------
+        start_ints : list of list of int
+            initial integer input data for clustering
+        start_floats : list of list of floats
+            initial float input data for clustering
+
+        Returns
+        -------
+        ints : list of list of int
+            integer input data for clustering
+        floats : list of list of floats
+            float input data for clustering
+        """
+        start_labels = [row[self._col_num["Label"]] for row in start_ints]
+        assert -1 not in start_labels, "-1 is a reserved label"
+        # this will form a binary tree,
+        # so at most there can be
+        # n_inputs + (n_unclustered*(n_unclustered-1))/2
+        n_inputs = len(start_ints)
+        if n_inputs == 0:
+            ints = np.empty((0, len(self.int_columns)))
+            floats = np.empty((0, len(self.float_columns)))
+            return ints, floats
+        assert n_inputs < self.memory_cap, \
+            f"More particles ({n_inputs}) than possible " +\
+            f"with this memory_cap ({self.memory_cap})"
+        # don't assume the form of start_ints
+        n_unclustered = np.sum([row[self._col_num["Parent"]] == -1
+                                for row in start_ints])
+        max_elements = n_inputs + int(0.5*(n_unclustered*(n_unclustered-1)))
+        # we limit the maximum elements in memory
+        max_elements = min(max_elements, self.memory_cap)
+        ints = -np.ones((max_elements, len(self.int_columns)),
+                        dtype=int)
+        ints[:n_inputs] = start_ints
+        floats = np.full((max_elements, len(self.float_columns)),
+                         np.nan, dtype=float)
+        floats[:n_inputs] = start_floats
+        return ints, floats
+
+    @property
+    def _2d_available_indices(self):
+        """
+        Using the _available_idxs make indices for indexing
+        the corrisponding minor or a 2d matrix.
+
+        Returns
+        -------
+        : tuple of arrays
+            tuple that will index the matrix minor
+        """
+        num_avail = len(self._available_idxs)
+        avail = np.tile(self._available_idxs, (num_avail, 1)).astype(int)
+        return avail.T, avail
+        
+    def _reoptimise_preallocated(self):
+        """Rearange the objects in memory to accomidate more.
+
+        Memory limit has been reached, the preallocated arrays
+        need to be rearanged to allow for removing objects which
+        are no longer needed.
+        anything still in _available_idxs will not be moved.
+        Also, remove anything in debug_data, becuase it will be
+        invalidated.
+        """
+        not_available = np.where(~self._available_mask)[0]
+        not_a_ints = self._ints[not_available]
+        not_a_floats = self._floats[not_available]
+        # before they are erased, add them to the back of the arrays
+        self._ints = np.concatenate((self._ints, not_a_ints))
+        self._floats = np.concatenate((self._floats, not_a_floats))
+        # now wipe those rows
+        self._ints[not_available] = -1
+        self._floats[not_available] = 0.
+        # avaliability remains as before
+        # so any other
+        # matrix can be ignored, assuming you only use
+        # available row/cols
+        if hasattr(self, "debug_data"):
+            # this is outdated, so scrap it
+            self.debug_data = {name: [] for name in self.debug_data}
+
+    def run(self):
+        """Perform the clustering, without storing debug_data."""
+        if not self._available_idxs:
+            return
+        self.setup_internal()
+        while True:
             idx1, idx2 = self.chose_pair()
             if self.stopping_condition(idx1, idx2):
                 break
@@ -1328,7 +1593,7 @@ class Agglomerative(Clustering):
         return jet_list
 
 
-class GeneralisedKT(Agglomerative):
+class GeneralisedKT(BinaryTree):
     default_params = {'DeltaR': .8,
                       'ExpofPTInput': 0,
                       'PhyDistance': 'angular',
@@ -1419,7 +1684,7 @@ class GeneralisedKT(Agglomerative):
         self._distances2.T[idx_parent, self._available_mask] = new_distance2
 
 
-class Spectral(Agglomerative):
+class Spectral(BinaryTree):
     default_params = {
                       'MaxMeanDist': 1.26,
                       'MaxMinDist': None,
@@ -1887,7 +2152,7 @@ class Spectral(Agglomerative):
         fig.set_tight_layout(True)
 
 
-class SpectralMean(Agglomerative):
+class SpectralMean(BinaryTree):
     def update_after_join(self, idx1, idx2, idx_parent):
         """Peform updates to internal data, after combining two particles.
 
@@ -1964,7 +2229,8 @@ class Partitional(Clustering):
 
     def create_jet(self, jet_labels):
         """
-        Caluclate the floats and ints created by combining two pseudojets.
+        Form a new jet by combinging many pseudojets,
+        also updating avaliability.
 
         Parameters
         ----------
@@ -2180,7 +2446,7 @@ def create_jet_contents(jet_list, existing_contents):
 
     Parameters
     ----------
-    jet_list : list of Agglomerative
+    jet_list : list of BinaryTree
         the unsplit agglomerative jets, one for each event.
     existing_contents : dict
         The contents dict for all previous events
@@ -2277,7 +2543,7 @@ def get_jet_names(eventWise):
 
     """
     # grab an ending from the pseudojet int columns
-    expected_ending = '_' + Agglomerative.int_columns[0]
+    expected_ending = '_' + BinaryTree.int_columns[0]
     possibles = [name.split('_', 1)[0] for name in eventWise.columns
                  if name.endswith(expected_ending)]
     # with the word Jet put on the end
@@ -2349,7 +2615,7 @@ def check_params(jet, eventWise, allow_write=True):
 
     Parameters
     ----------
-    jet : Agglomerative or dict
+    jet : BinaryTree or dict
         the jet with parameters or just a dict of params
     eventWise : EventWise
         eventWise object to look for jet parameters in
