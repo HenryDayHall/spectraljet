@@ -332,13 +332,13 @@ class CALEv2(FormJets.Partitional):
 
 class CALEv3(FormJets.Agglomerative):
     _cheby_coeffs = CALEFunctions.cheby_coeff(lambda x: np.exp(-x), 50)
-    default_params = {'Sigma': 0.3,
+    default_params = {'Sigma': 0.1,
                       'InvPower': 1.,
                       'Cutoff': 0.02,
                       'WeightExponent': 1.,
                       'SeedGenerator': 'PtCenter',
                       'ToAffinity': 'exp',
-                      'SeedIncrement': 3}
+                      'SeedIncrement': 1}
     permited_values = {'Sigma': Constants.numeric_classes['pdn'],
                        'InvPower': Constants.numeric_classes['pdn'],
                        'Cutoff': Constants.numeric_classes['rn'],
@@ -347,6 +347,11 @@ class CALEv3(FormJets.Agglomerative):
                        'ToAffinity': ['exp', 'inv'],
                        'SeedIncrement': Constants.numeric_classes['nn']}
     max_seeds = 15
+
+    def _get_max_elements(self, n_inputs, n_unclustered):
+        max_elements = n_inputs + int(0.5*(n_unclustered*(n_unclustered-1))) + 1
+        max_elements += self.max_seeds
+        return max_elements
 
     def _setup_clustering_functions(self):
         """
@@ -431,6 +436,8 @@ class CALEv3(FormJets.Agglomerative):
             return True
         if len(self._available_idxs) < 2:
             return True
+        if not np.any(self._unclustered_leaf_mask):
+            return True
         return False
 
     def next_jets(self, fig=None, ax=None):
@@ -443,7 +450,9 @@ class CALEv3(FormJets.Agglomerative):
         # there should eb no modification of the ints and floats
         jet_list = []
         # Cannot have more jets than input particles.
-        self._insert_new_seeds(self._n_seeds, self._available_mask)
+        # TODO this vs self._available_mask
+        self._insert_new_seeds(self._n_seeds, self._unclustered_leaf_mask)
+        #self._insert_new_seeds(self._n_seeds, self._available_mask)
         unallocated = set(self.Available_Label)
         mask = np.isin(self.Label, list(self.Available_Label) + self._seed_labels)
         # this will include the current seeds.
@@ -472,7 +481,6 @@ class CALEv3(FormJets.Agglomerative):
                 break  # one unallocated object
         # this batch of seeds is done.
         self._remove_seeds()
-        self._n_seeds += self.SeedIncrement
         if not found_content:
             self._n_seeds += self.SeedIncrement
         return jet_list

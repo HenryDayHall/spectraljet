@@ -941,6 +941,10 @@ class Clustering:
 class Agglomerative(Clustering):
     debug_attributes = ["available_mask"]
 
+    def _get_max_elements(self, n_inputs, n_unclustered):
+        max_elements = n_inputs + int(0.5*(n_unclustered*(n_unclustered-1))) + 1
+        return max_elements
+
     def create_int_float_tables(self, start_ints, start_floats):
         """ Format the data for clustering, allocating memory.
         The tables created have space for pesudojets that will be created.
@@ -975,7 +979,7 @@ class Agglomerative(Clustering):
         # don't assume the form of start_ints
         n_unclustered = np.sum([row[self._col_num["Parent"]] == -1
                                 for row in start_ints])
-        max_elements = n_inputs + int(0.5*(n_unclustered*(n_unclustered-1))) + 1
+        max_elements = self._get_max_elements(n_inputs, n_unclustered)
         # we limit the maximum elements in memory
         max_elements = min(max_elements, self.memory_cap)
         ints = -np.ones((max_elements, len(self.int_columns)),
@@ -1028,23 +1032,25 @@ class Agglomerative(Clustering):
             # this is outdated, so scrap it
             self.debug_data = {name: [] for name in self.debug_data}
 
+    @property
+    def _unclustered_leaf_mask(self):
+        mask = (self.Child1 == -1) & self._available_mask
+        return mask
+
     def run(self):
         """Perform the clustering, without storing debug_data."""
         if not self._available_idxs:
             return
         self.setup_internal()
-        while True:
-            if self.stopping_condition():
-                break
+        while not self.stopping_condition():
             list_of_jets = self.next_jets()
             for jet in list_of_jets:
-                self.create_jet(jet)
-        unallocated_leaves = [self.Label[idx] for idx in self._available_idxs
-                              if self.Child1[idx] == -1]
-        if unallocated_leaves:
-            # Store anything else as a 1-particle jet
-            for loose in unallocated_leaves:
-                self.create_jet([loose])
+                self.create_jet(jet, jet_avaliable=True)
+        # Store anything else as a 1-particle jet
+        for loose in self.Label[self._unclustered_leaf_mask]:
+            self.create_jet([loose])
+        # now make everything unavaliable
+        self._update_avalible(self._available_idxs)
 
     def stopping_condition(self):
         """ Will be called before taking another step.
@@ -1056,7 +1062,7 @@ class Agglomerative(Clustering):
         """
         raise NotImplementedError
 
-    def create_jet(self, jet_labels):
+    def create_jet(self, jet_labels, jet_avaliable=False):
         """
         Create a new jet by combining to specified pseudojets,
         also declare the combined components unavaliable.
@@ -1083,7 +1089,6 @@ class Agglomerative(Clustering):
         sorter = np.argsort(self.Label)
         jet_idxs = sorter[np.searchsorted(self.Label, jet_labels,
                                           sorter=sorter)]
-        self._update_avalible(jet_idxs)
         # chose the new
         new_label = np.max(self.Label) + 1
         new_idx = self._next_free_row()
@@ -1110,6 +1115,11 @@ class Agglomerative(Clustering):
         self.Rapidity[new_idx] = \
             Components.ptpze_to_rapidity(self.PT[new_idx], self.Pz[new_idx],
                                          self.Energy[new_idx])
+        # update the avaliable
+        if jet_avaliable:
+            self._update_avalible(jet_idxs, {new_idx,})
+        else:
+            self._update_avalible(jet_idxs)
 
     def next_jets(self):
         """ Find the next jets to form
