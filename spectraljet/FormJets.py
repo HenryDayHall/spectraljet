@@ -1039,7 +1039,12 @@ class Agglomerative(Clustering):
                 break
             for jet in list_of_jets:
                 self.create_jet(jet)
-
+        unallocated_leaves = [self.Label[idx] for idx in self._available_idxs
+                              if self.Child1[idx] == -1]
+        if unallocated_leaves:
+            # Store anything else as a 1-particle jet
+            for loose in unallocated_leaves:
+                self.create_jet([loose])
 
     def stopping_condition(self, list_of_jets):
         """ Will be called before taking another step.
@@ -1121,7 +1126,6 @@ class Agglomerative(Clustering):
         """
         raise NotImplementedError
 
-
     def get_decendants(self, last_only=True, start_label=None, start_idx=None):
         """
         Get all decendants of a chosen particle
@@ -1152,9 +1156,9 @@ class Agglomerative(Clustering):
         # eraise any parents if the particle isn't real
         parents[labels == -1] = -1
         if start_idx is None:
-            start_idx = np.where(label == start_label)[0][0]
+            start_idx = np.where(labels == start_label)[0][0]
         elif start_label is None:
-            start_label = label[start_idx]
+            start_label = labels[start_idx]
         else:
             raise TypeError("Need to specify a pseudojet")
         labels = labels.tolist()
