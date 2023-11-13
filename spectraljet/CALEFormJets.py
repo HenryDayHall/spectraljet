@@ -23,8 +23,10 @@ class CALE(FormJets.Partitional):
 
     def setup_internal(self):
         """ Runs before allocate """
+        self._ca_distances2 = FormJets.ca_distances2(
+                self.Leaf_Rapidity, self.Leaf_Phi)
         self.laplacien, self.l_max_val = CALEFunctions.make_L(
-                self.Leaf_Rapidity, self.Leaf_Phi,
+                self._ca_distances2,
                 normalised=self.Normalised, sigma=self.Sigma)
 
     def allocate(self):
@@ -36,7 +38,7 @@ class CALE(FormJets.Partitional):
         # Cannot have more jets than input particles.
         max_jets = min(self.NRounds, len(self.Leaf_Rapidity))
 
-        l_idx = CALEFunctions.make_L_idx(self.Leaf_Rapidity, self.Leaf_Phi, self.Leaf_PT)
+        l_idx = CALEFunctions.make_L_idx(self._ca_distances2, self.Leaf_PT)
 
         # Precompute L_idx sum and its sorted indices
         seed_ordering = l_idx.sum(axis=0).argsort()
@@ -134,20 +136,100 @@ class CALEv2(FormJets.Partitional):
         else:
             raise ValueError('SeedGenerator must be PtCenter, Unsafe or Random')
         if self.ToAffinity == 'exp':
-            def laplacian(pts, rapidities, phis):
-                return CALEFunctions.pt_laplacian(pts, rapidities, phis,
-                    weight_exponent=self.WeightExponent, sigma=self.Sigma)
+            def affinity(distances2, sigma=self.Sigma):
+                return np.exp(-(distances2)/(2*sigma**2))
         elif self.ToAffinity == 'inv':
-            def laplacian(pts, rapidities, phis):
-                return CALEFunctions.pt_laplacian_inv(pts, rapidities, phis,
-                    weight_exponent=self.WeightExponent, power=self.InvPower)
+            inv_multiplier = -self.InvPower*0.5
+            def affinity(distances2, mult=inv_multiplier):
+                return distances2**inv_multiplier
         else:
-            raise ValueError('ToAffinity must be exp or inv')
-        self._to_laplacian = laplacian
+            raise ValueError("ToAffinity must be inv or exp")
+        self._calc_affinity = affinity
+        def laplacian(pts, ca_distance2, affinites):
+            return CALEFunctions.pt_laplacian(pts, ca_distances2, affinities,
+                weight_exponent=self.WeightExponent)
+        self._calc_laplacian = laplacian
 
     def setup_internal(self):
-        """ Runs before allocate """
+        """Setup needed for a particular clustering calculation.
+        Runs before allocate.
+
+        Should generate things like matrices of distances.
+        """
+        # Keep track of indices currently holding seed particles
         self._seed_labels = []
+        # in here we will create various permanant matrices
+        self.setup_internal_local()
+        # in here, matricies that are transient and must be recreated each
+        # time the particles change are created
+        self.setup_internal_global()
+
+    def setup_internal_local(self):
+        """Setup needed for a particular clustering calculation.
+
+        Should generate things like matrices of distances.
+        Only includes local object, where a particle combining
+        only updates a small subset of entries, rather than the whole table.
+        """
+        space_size = (self._ints.shape[0], self._ints.shape[0])
+        # distance in physical space
+        angular_distances2 = self._calc_phys_distances2(
+            self.Available_Rapidity, self.Available_Phi)
+        np.fill_diagonal(angular_distances2, 0.)
+        self._phys_distances2 = np.empty(space_size, dtype=float)
+        self._phys_distances2[self._2d_available_indices] = \
+            angular_distances2
+        # affinities in physical space
+        self._affinity = np.empty(space_size, dtype=float)
+        affinity = self._calc_affinity(angular_distances2)
+        self._affinity[self._2d_available_indices] = affinity
+        # symmetric size, always symmetric in the first step
+        self._floats[self._available_idxs, self._col_num["Size"]] =\
+            np.sum(affinity, axis=1)
+
+    def _update_matrices(self, new_idxs):
+        """Peform updates to internal data, fixing the row of new_idx
+
+        Parameters
+        ----------
+        new_idxs : list of int
+            indices of points needing update
+        """
+        # physical distances
+        new_rapidity = self.Rapidity[new_idxs]
+        new_phi = self.Phi[new_idxs]
+        new_angular_distance2 = self._calc_phys_distances2(
+            self.Available_Rapidity, self.Available_Phi,
+            new_rapidity, new_phi)
+        masked_idxs = np.isin(self._available_idxs, new_idxs)
+        new_angular_distance2[masked_idxs] = 0.
+        self._phys_distances2[new_idxs, self._available_mask] = \
+            new_angular_distance2
+        self._phys_distances2.T[new_idxs, self._available_mask] = \
+            new_angular_distance2
+
+        # new affinity
+        new_affinity = self._calc_affinity(new_angular_distance2)
+        new_affinity[masked_idxs] = 0.
+        self._affinity[new_idxs, self._available_mask] = new_affinity
+        self._affinity.T[new_idxs, self._available_mask] = new_affinity
+
+        # everything else needs global calculation
+        self.setup_internal_global()
+
+    def setup_internal_global(self):
+        """Setup needed for a particular clustering calculation.
+
+        Should generate things like matrices of distances.
+        Only includes global calculation where particles combining
+        updates all entries, rather than a subset
+        As such, this is called after each combination.
+        """
+        # laplacian
+        affinity = self._affinity[self._2d_available_indices]
+        distance2 = self._calc_phys_distances2[self._2d_available_indices]
+        laplacian = self._calc_laplacian(self.Available_PT, distance2, affinity)
+        self._laplacian = laplacian
 
     def _insert_new_seeds(self, n_seeds, mask):
         """
@@ -158,32 +240,31 @@ class CALEv2(FormJets.Partitional):
                 self.Px[mask], self.Py[mask], self.Pz[mask],
                 self.PT[mask], self.Rapidity[mask], self.Phi[mask],
                 n_centers=n_seeds)
-        current_max_label = np.max(self.Label)
-        for i in range(len(seed_ptrapphi)):
-            new_label = current_max_label + 1
-            current_max_label += 1
-            self._seed_labels.append(new_label)
-            new_idx = self._next_free_row()
-            self.Label[new_idx] = new_label
-            # set all relationships to -1
-            # and having Parent=-1
-            self.Child1[new_idx] = -1
-            self.Child2[new_idx] = -1
-            self.Parent[new_idx] = -1
-            self.Rank[new_idx] = -1
-            # PT px py pz eta phi energy join_distance
-            # TODO optimise
-            self.Energy[new_idx] = np.mean(self.Leaf_Energy)
-            self.Px[new_idx] = seed_pxpypz[i, 0]
-            self.Py[new_idx] = seed_pxpypz[i, 1]
-            self.Pz[new_idx] = seed_pxpypz[i, 2]
-            self.Size[new_idx] = 0.
-            # it's easier conceptually to calculate pt, phi and rapidity
-            # afresh than derive them
-            # for some reason this must be unpacked then assigned
-            self.Phi[new_idx] = seed_ptrapphi[i, 2]
-            self.PT[new_idx] = seed_ptrapphi[i, 0]
-            self.Rapidity[new_idx] = seed_ptrapphi[i, 1]
+        first_label = np.max(self.Label) + 1
+        labels = list(range(first_label, first_label + n_seeds))
+        self._seed_labels += labels
+        rows = [self._next_free_row for _ in labels]
+        self.Label[rows] = labels
+        # set all relationships to -1
+        # and having Parent=-1
+        self.Child1[rows] = -1
+        self.Child2[rows] = -1
+        self.Parent[rows] = -1
+        self.Rank[rows] = -1
+        # PT px py pz eta phi energy join_distance
+        self.Energy[rows] = np.mean(self.Leaf_Energy)
+        self.Px[rows] = seed_pxpypz[:, 0]
+        self.Py[rows] = seed_pxpypz[:, 1]
+        self.Pz[rows] = seed_pxpypz[:, 2]
+        self.Size[rows] = 0.
+        # it's easier conceptually to calculate pt, phi and rapidity
+        # afresh than derive them
+        # for some reason this must be unpacked then assigned
+        self.Phi[rows] = seed_ptrapphi[:, 2]
+        self.PT[rows] = seed_ptrapphi[:, 0]
+        self.Rapidity[rows] = seed_ptrapphi[:, 1]
+        self._update_avalible(idxs_in=set(rows))
+        self._update_matrices(rows)
 
     def _remove_seeds(self):
         sorter = np.argsort(self.Label)
@@ -193,8 +274,7 @@ class CALEv2(FormJets.Partitional):
         # just wipe the label out
         self.Label[seed_idxs] = -1
         self._seed_labels.clear()
-        self._available_idxs = [idx for idx in self._available_idxs if idx not in seed_idxs]
-        self._available_mask[seed_idxs] = False
+        self._update_avalible(seed_idxs)
 
     def allocate(self, fig=None, ax=None):
         """Sort the labels into exclusive jets"""
@@ -213,10 +293,8 @@ class CALEv2(FormJets.Partitional):
             self._insert_new_seeds(n_seeds, mask)
             mask = np.isin(self.Label, list(unallocated_leaves) + self._seed_labels)
             # this will include the current seeds.
-            laplacien = self._to_laplacian(
-                    self.PT[mask], self.Rapidity[mask], self.Phi[mask])
-            max_eigval = CALEFunctions.max_eigenvalue(laplacien)
-            num_points = len(laplacien)
+            max_eigval = CALEFunctions.max_eigenvalue(self._laplacian)
+            num_points = len(self._laplacian)
             seed_jets = []
             found_content = False
             for seed_label in self._seed_labels:
@@ -224,7 +302,7 @@ class CALEv2(FormJets.Partitional):
                 # TODO, should the range be from 0 to max_eigval?
                 # do the eigenvalues actually go negative?
                 wavelets = CALEFunctions.cheby_op(seed_location.astype(int),
-                                                  laplacien, [self._cheby_coeffs],
+                                                  self._laplacian, [self._cheby_coeffs],
                                                   (-max_eigval, max_eigval))[0]
                 max_wavelet = np.max(wavelets[~seed_location])
                 min_wavelet = np.min(wavelets[~seed_location])
@@ -271,10 +349,8 @@ class CALEv2(FormJets.Partitional):
             self._insert_new_seeds(n_seeds, mask)
             mask = np.isin(self.Label, list(unallocated_leaves) + self._seed_labels)
             # this will include the current seeds.
-            laplacien = self._to_laplacian(
-                    self.PT[mask], self.Rapidity[mask], self.Phi[mask])
-            max_eigval = CALEFunctions.max_eigenvalue(laplacien)
-            num_points = len(laplacien)
+            max_eigval = CALEFunctions.max_eigenvalue(self._laplacian)
+            num_points = len(self._laplacian)
             seed_jets = []
             found_content = False
             for seed_label in self._seed_labels:
@@ -367,16 +443,19 @@ class CALEv3(FormJets.Agglomerative):
         else:
             raise ValueError('SeedGenerator must be PtCenter, Unsafe or Random')
         if self.ToAffinity == 'exp':
-            def laplacian(pts, rapidities, phis):
-                return CALEFunctions.pt_laplacian(pts, rapidities, phis,
-                    weight_exponent=self.WeightExponent, sigma=self.Sigma)
+            def affinity(distances2, sigma=self.Sigma):
+                return np.exp(-(distances2)/(2*sigma**2))
         elif self.ToAffinity == 'inv':
-            def laplacian(pts, rapidities, phis):
-                return CALEFunctions.pt_laplacian_inv(pts, rapidities, phis,
-                    weight_exponent=self.WeightExponent, power=self.InvPower)
+            inv_multiplier = -self.InvPower*0.5
+            def affinity(distances2, mult=inv_multiplier):
+                return distances2**inv_multiplier
         else:
-            raise ValueError('ToAffinity must be exp or inv')
-        self._to_laplacian = laplacian
+            raise ValueError("ToAffinity must be inv or exp")
+        self._calc_affinity = affinity
+        def laplacian(pts, ca_distance2, affinites):
+            return CALEFunctions.pt_laplacian(pts, ca_distances2, affinities,
+                weight_exponent=self.WeightExponent)
+        self._calc_laplacian = laplacian
 
     def setup_internal(self):
         """ Runs before allocate """
@@ -406,7 +485,6 @@ class CALEv3(FormJets.Agglomerative):
             self.Parent[new_idx] = -1
             self.Rank[new_idx] = -1
             # PT px py pz eta phi energy join_distance
-            # TODO optimise
             self.Energy[new_idx] = np.mean(self.Leaf_Energy)
             self.Px[new_idx] = seed_pxpypz[i, 0]
             self.Py[new_idx] = seed_pxpypz[i, 1]
@@ -456,7 +534,7 @@ class CALEv3(FormJets.Agglomerative):
         unallocated = set(self.Available_Label)
         mask = np.isin(self.Label, list(self.Available_Label) + self._seed_labels)
         # this will include the current seeds.
-        laplacien = self._to_laplacian(
+        laplacien = self._calc_laplacian(
                 self.PT[mask], self.Rapidity[mask], self.Phi[mask])
         max_eigval = CALEFunctions.max_eigenvalue(laplacien)
         num_points = len(laplacien)
@@ -506,7 +584,7 @@ class CALEv3(FormJets.Agglomerative):
         unallocated = set(self.Available_Label)
         mask = np.isin(self.Label, list(self.Available_Label) + self._seed_labels)
         # this will include the current seeds.
-        laplacien = self._to_laplacian(
+        laplacien = self._calc_laplacian(
                 self.PT[mask], self.Rapidity[mask], self.Phi[mask])
         max_eigval = CALEFunctions.max_eigenvalue(laplacien)
         num_points = len(laplacien)

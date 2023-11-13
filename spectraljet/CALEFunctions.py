@@ -221,7 +221,7 @@ def unsafe_centers(energies, pxs, pys, pzs, pts, rapidities, phis, **kwargs):
     return seed_pxpypz, seed_ptrapphi
 
 
-def pt_laplacian(pts, rapidities, phis, weight_exponent, sigma):
+def pt_laplacian(pts, ca_distances2, affinities, weight_exponent, sigma):
     """
     A laplacian matrix, where affinities have been scaled by pt,
     and the laplacian itself is normalised by p_Ti*sum_j p_Tj dij
@@ -230,10 +230,12 @@ def pt_laplacian(pts, rapidities, phis, weight_exponent, sigma):
     ----------
     pts : numpy array of floats length N
       pts of existing particles
-    rapidities : numpy array of floats length N
-      rapidities of existing particles
-    phis : numpy array of floats length N
-      phis of existing particles
+    ca_distances2 : numpy array of floats N by N
+      distances squared between each pariticle by the
+      Cambridge Aachen metric.
+    affinities : numpy array of floats N by N
+      the affinity between each particle,
+      normally calculated at exp(-d^2/(2sigma^2))
     weight_exponent : float
       An exponent on the distance factor of other weights.
     sigma : float
@@ -244,42 +246,7 @@ def pt_laplacian(pts, rapidities, phis, weight_exponent, sigma):
     laplacian : numpy array of floats (N, N)
       Pt normalised laplacian matrix
     """
-    ca_distances2 = FormJets.ca_distances2(rapidities, phis)
     pt_col = pts.reshape(-1, 1)
-    affinities = pts * pt_col * np.exp(-ca_distances2/(2*sigma**2))
-    np.fill_diagonal(affinities, 0.)
-    # if the exponent is 0, this is equivalent to normalisation = pts
-    normalisation = pts * np.sum(pt_col * ca_distances2**0.5, axis=0)**weight_exponent
-    laplacian = FormJets.normalised_laplacian(affinities, normalisation)
-    return laplacian
-
-
-def pt_laplacian_inv(pts, rapidities, phis, weight_exponent, power):
-    """
-    A laplacian matrix, where affinities have been scaled by pt,
-    and the laplacian itself is normalised by p_Ti*sum_j p_Tj dij
-
-    Parameters
-    ----------
-    pts : numpy array of floats length N
-      pts of existing particles
-    rapidities : numpy array of floats length N
-      rapidities of existing particles
-    phis : numpy array of floats length N
-      phis of existing particles
-    weight_exponent : float
-      An exponent on the distance factor of other weights.
-    power : float
-      Positive float which is a parameter of the affinities
-
-    Returns
-    -------
-    laplacian : numpy array of floats (N, N)
-      Pt normalised laplacian matrix
-    """
-    ca_distances2 = FormJets.ca_distances2(rapidities, phis)
-    pt_col = pts.reshape(-1, 1)
-    affinities = pts * pt_col * ca_distances2**(-0.5*power)
     np.fill_diagonal(affinities, 0.)
     # if the exponent is 0, this is equivalent to normalisation = pts
     normalisation = pts * np.sum(pt_col * ca_distances2**0.5, axis=0)**weight_exponent
@@ -475,15 +442,14 @@ def cheby_op(wavelet_delta, laplacian, chebyshef_coefficients, arange):
 
 
 
-def make_L_idx(particle_rapidities, particle_phis, particle_pts):
+def make_L_idx(ca_distances2, particle_pts):
     """ Makes mask for where to place wavelet in the particle array.
 
     Parameters
     ----------
-    rapidity : array of float
-        Row of rapidity values.
-    phi : array of float
-        Row of phi values.
+    ca_distances2 : numpy array of floats N by N
+      distances squared between each pariticle by the
+      Cambridge Aachen metric.
     particle_pts : array of float 
         row of pts values.
     idx_no : int (optional)
@@ -495,23 +461,26 @@ def make_L_idx(particle_rapidities, particle_phis, particle_pts):
     L_idx : distance array determined by the anti-kt metric
     """
 
-    ca_distances = np.sqrt(FormJets.ca_distances2(particle_rapidities, particle_phis))
+    ca_distances = np.sqrt(ca_distances2)
     gen_kt_factor = FormJets.genkt_factor(-1, np.array(particle_pts, dtype=float))
     L_idx = ca_distances * gen_kt_factor
 
     return L_idx
 
 
-def make_L(particle_rapidities, particle_phis, normalised=True, sigma = 0.15):
+def make_L(ca_distances2, normalised=True, sigma = 0.15):
     """ Makes a weighted Laplacian from particle rapidities and phis,
     using the method found in CALE paper for swiss roll example.
 
     Parameters
     ----------
-    rapidity : array of float
-        Row of rapidity values.
-    phi : array of float
-        Row of phi values.
+    ca_distances2 : numpy array of floats N by N
+      distances squared between each pariticle by the
+      Cambridge Aachen metric.
+    normalised : bool
+      Should the laplacian be normailsed to a
+      symmetric laplacian?
+      i.e. L=D^(-1/2)(D-A)D^(1/2)
     sigma : int (optional)
         (sigma) level of weight scaling in the graph,
         larger values means points further away from
@@ -525,8 +494,7 @@ def make_L(particle_rapidities, particle_phis, normalised=True, sigma = 0.15):
         Largest eigenvalue
     """
 
-    distances2 = FormJets.ca_distances2(particle_rapidities, particle_phis)
-    affinities = FormJets.exp_affinity(distances2, sigma)
+    affinities = FormJets.exp_affinity(ca_distances2, sigma)
     #affinities = np.exp(-distances2**2 / (2 * sigma**2))
     #np.fill_diagonal(affinities, 0.)
     diagonals = np.diag(np.sum(affinities, axis=0))
