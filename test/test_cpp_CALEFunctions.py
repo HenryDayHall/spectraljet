@@ -74,15 +74,6 @@ def test_ChebyshevCoefficients_vs_py_cheb():
     tst.assert_allclose(coefficients, py_coeffs, atol=1e-4)
 
 
-class TestCPPMakeLIdx(test_CALEFunctions.TestMakeLIdx):
-    def function(self, particle_rapidities, particle_phis, particle_pts):
-        particle_rapidities = list(particle_rapidities)
-        particle_phis = list(particle_phis)
-        particle_pts = list(particle_pts)
-        metric = CALE.JetMetrics.antikt
-        distances2 = CALE.NamedDistance2Matrix(particle_pts, particle_rapidities, particle_phis, metric)
-        return np.sqrt(distances2)
-
 
 def test_VectorAddition():
     # Two empty vectors should make another empty vector

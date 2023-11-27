@@ -221,7 +221,7 @@ def unsafe_centers(energies, pxs, pys, pzs, pts, rapidities, phis, **kwargs):
     return seed_pxpypz, seed_ptrapphi
 
 
-def pt_laplacian(pts, ca_distances2, affinities, weight_exponent, sigma):
+def pt_laplacian(pts, ca_distances2, affinities, weight_exponent):
     """
     A laplacian matrix, where affinities have been scaled by pt,
     and the laplacian itself is normalised by p_Ti*sum_j p_Tj dij
@@ -238,8 +238,6 @@ def pt_laplacian(pts, ca_distances2, affinities, weight_exponent, sigma):
       normally calculated at exp(-d^2/(2sigma^2))
     weight_exponent : float
       An exponent on the distance factor of other weights.
-    sigma : float
-      Positive float which is a parameter of the affinities
 
     Returns
     -------
@@ -573,13 +571,11 @@ def cluster_particles(particle_rapidities, particle_phis, particle_pts, s=0.11, 
     cluster_list = []
 
     # Generate the laplacian matrix
-    L, l_max_val = make_L(particle_rapidities, particle_phis, normalised=normalised, sigma=s)
-
-    # Convert particle data to appropriate format
-    particle_data = np.array((particle_rapidities, particle_phis, particle_pts))
+    ca_distances2 = FormJets.ca_distances2(particle_rapidities, particle_pts)
+    L, l_max_val = make_L(ca_distances2, normalised=normalised, sigma=s)
     
     # Generate the L_idx matrix
-    L_idx = make_L_idx(*particle_data)
+    L_idx = make_L_idx(ca_distances2, particle_pts)
 
     # Precompute L_idx sum and its sorted indices
     seed_ordering = L_idx.sum(axis=0).argsort()

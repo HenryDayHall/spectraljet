@@ -5,7 +5,7 @@ sys.path.append(str(path_root1))
 import unittest
 import numpy as np
 import numpy.testing as tst
-from spectraljet import CALEFunctions
+from spectraljet import CALEFunctions, FormJets
 
 
 
@@ -131,23 +131,27 @@ class TestPtCenters(TestRandomCenters):
 
 
 def test_pt_laplacian():
+    # pts, ca_distances2, affinities, weight_exponent sigma
     # an empty event shouldn't make the funciton choke
     found = CALEFunctions.pt_laplacian(np.array([]),
-                                       np.array([]),
-                                       np.array([]),
-                                       0., 1.)
+                                       np.array([]).reshape((0,0)),
+                                       np.array([]).reshape((0,0)),
+                                       0.)
     assert found.shape == (0,0)
     # a single particle should return a 1 by 1 matrix
     found = CALEFunctions.pt_laplacian(np.array([1.]),
-                                       np.array([0.]),
-                                       np.array([0.]),
-                                       0., 1.)
+                                       np.array([[1.]]),
+                                       np.array([[2.]]),
+                                       0.)
     assert found.shape == (1,1)
     # now we make an example event with 3 particles
     pts = np.array([1., 1., 1.])
-    raps = np.array([0., 0., 0.])
-    phis = np.array([0., -1., 1.])
-    found = CALEFunctions.pt_laplacian(pts, raps, phis, 0., np.sqrt(0.5))
+    ca_distances2 = np.array([[0., 1., 1.],
+                              [1., 0., 4.],
+                              [1., 4., 0.]])
+    affinities = np.exp(-ca_distances2)
+
+    found = CALEFunctions.pt_laplacian(pts, ca_distances2, affinities, 0.)
     # as the pts are all 1. no pt factor will have an impact
     aij = np.exp(-1.)
     aij_large = np.exp(-4.)
@@ -156,7 +160,8 @@ def test_pt_laplacian():
                          [-aij, -aij_large, aij + aij_large]])
     tst.assert_allclose(found, expected)
     # changing the sigma should change the result
-    found = CALEFunctions.pt_laplacian(pts, raps, phis, 0., 2.)
+    affinities = np.exp(-ca_distances2/2.**3)
+    found = CALEFunctions.pt_laplacian(pts, ca_distances2, affinities, 0.)
     aij = np.exp(-1./8.)
     aij_large = np.exp(-1./2.)
     expected = np.array([[2*aij, -aij, -aij],
@@ -164,7 +169,8 @@ def test_pt_laplacian():
                          [-aij, -aij_large, aij + aij_large]])
     tst.assert_allclose(found, expected)
     # changing the pt factor should change the result
-    found = CALEFunctions.pt_laplacian(pts, raps, phis, 1., np.sqrt(0.5))
+    affinities = np.exp(-ca_distances2)
+    found = CALEFunctions.pt_laplacian(pts, ca_distances2, affinities, 1.)
     aij = np.exp(-1.)
     aij_large = np.exp(-4.)
     cross = np.sqrt(2)*np.sqrt(3)
@@ -174,9 +180,11 @@ def test_pt_laplacian():
     tst.assert_allclose(found, expected)
     # points can be at 0 distance
     pts = np.array([1., 1., 1.])
-    raps = np.array([0., 0., 1.])
-    phis = np.array([0., 0., 0.])
-    found = CALEFunctions.pt_laplacian(pts, raps, phis, 0., np.sqrt(0.5))
+    ca_distances2 = np.array([[0., 0., 1.],
+                              [0., 0., 1.],
+                              [1., 1., 0.]])
+    affinities = np.exp(-ca_distances2)
+    found = CALEFunctions.pt_laplacian(pts, ca_distances2, affinities, 0.)
     aij = np.exp(-1.)
     expected = np.array([[1. + aij, -1., -aij],
                          [-1., 1. + aij, -aij],
@@ -398,6 +406,7 @@ class TestMakeLIdx(unittest.TestCase):
         # Becuase of the phi values, no angular considerations are needed.
         phi = [0, np.pi/2, np.pi]
         pT = [1, 2, 3]
+        ca_distances2 = FormJets.ca_distances2(y, phi)
         # as the values given are less than 1, this is clearly an anti-kt distance
         #
         # there are 2 ways I could anticipate defining the anti-kt distance;
@@ -419,7 +428,7 @@ class TestMakeLIdx(unittest.TestCase):
                                     [0.824227, 0., 0.549484],
                                     [1.098969, 0.549484, 0.]])
 
-        np.testing.assert_almost_equal(self.function(y, phi, pT), expected_output,
+        np.testing.assert_almost_equal(self.function(ca_distances2, pT), expected_output,
                                        decimal=5)
 
 
@@ -430,44 +439,48 @@ class TestMakeLIdx(unittest.TestCase):
         #    self.function([], [], [])
 
         # Sugested test
-        found = self.function([], [], [])
+        found = self.function([], [])
         assert len(found) == 0
 
     def test_length_one(self):
-        y = [0.5]
-        phi = [np.pi/4]
-        pT = [1]
+        pT = [0.5]
+        ca_distances2 = np.array([[0.]])
         expected_output = np.array([[0.]])
-        np.testing.assert_almost_equal(self.function(y, phi, pT), expected_output)
+        np.testing.assert_almost_equal(self.function(ca_distances2, pT), expected_output)
 
     def test_same_pT_values(self):
         y = [0.5, 1, 1.5]
         phi = [0, np.pi/2, np.pi]
+        ca_distances2 = FormJets.ca_distances2(y, phi)
         pT = [2, 2, 2]
-        mat = self.function(y, phi, pT)
+        mat = self.function(ca_distances2, pT)
         self.assertTrue((np.diag(mat) == 0).all())  # Check diagonal elements are zero
 
     def test_large_y_difference(self):
         y = [0.5, 10]
         phi = [0, np.pi/2]
+        ca_distances2 = FormJets.ca_distances2(y, phi)
         pT = [1, 2]
-        mat = self.function(y, phi, pT)
+        mat = self.function(ca_distances2, pT)
         self.assertTrue((np.diag(mat) == 0).all())
 
     def test_phi_exceeding_2pi(self):
         y = [0.5, 1]
         phi = [0, 3*np.pi]
+        ca_distances2 = FormJets.ca_distances2(y, phi)
         pT = [1, 2]
+        mat1 = self.function(ca_distances2, pT)
         expected_phi = [0, np.pi]
-        mat1 = self.function(y, phi, pT)
-        mat2 = self.function(y, expected_phi, pT)
+        ca_distances2 = FormJets.ca_distances2(y, expected_phi)
+        mat2 = self.function(ca_distances2, pT)
         np.testing.assert_almost_equal(mat1, mat2)
 
     def test_symmetry(self):
         y = [0.5, 1, 2]
         phi = [0, np.pi/4, np.pi/2]
+        ca_distances2 = FormJets.ca_distances2(y, phi)
         pT = [1, 2, 3]
-        mat = np.array(self.function(y, phi, pT))
+        mat = np.array(self.function(ca_distances2, pT))
         np.testing.assert_almost_equal(mat, mat.T)
 
 

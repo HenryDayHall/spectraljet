@@ -124,7 +124,7 @@ class TestCALECpp(TestCALE):
 
 class TestCALEv2(TestCALE):
     to_test = CALEFormJets.CALEv2
-    jet_params = dict(Sigma=0.8, Cutoff=0.9, WeightExponent=0., SeedGenerator='PtCenter')
+    jet_params = dict(Sigma=0.4, Cutoff=0.01, WeightExponent=0., SeedGenerator='PtCenter')
 
     def test_trivial_case(self):
         # ~~~~~~~~
