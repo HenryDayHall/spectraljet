@@ -1,5 +1,6 @@
-![Run python tests](https://github.com/HenryDayHall/spectraljet/actions/workflows/ci.yml/badge.svg)
-[![codecov](https://codecov.io/gh/HenryDayHall/spectraljet/branch/master/graph/badge.svg?token=RYDQA14HN9)](https://codecov.io/gh/HenryDayHall/spectraljet)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![Run python tests](https://github.com/HenryDayHall/spectraljet/actions/workflows/ci.yml/badge.svg)](https://github.com/HenryDayHall/spectraljet/actions/workflows/ci.yml)
+![Code Coverage](https://img.shields.io/badge/Code%20Coverage-83%25-success?style=flat)
 [![DOI](https://zenodo.org/badge/454169021.svg)](https://zenodo.org/badge/latestdoi/454169021)
 
 # Spectral clustering
