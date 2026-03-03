@@ -21,7 +21,7 @@ jobs:
               run: |
                   python -m pip install --upgrade pip
                   pip install -r requirements.txt
-                  pip install pytest
+                  pip install pytest==8.0  # Newer versions have problems with pathlib
                   pip install pytest-cov
             - name: Get submodules
               run: git submodule update --init --recursive
